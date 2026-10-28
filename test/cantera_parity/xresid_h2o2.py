@@ -23,6 +23,8 @@ import subprocess
 import sys
 import tempfile
 
+from xresid_gates import RTOL, InvalidReport, assess_report
+
 for v in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS"):
     os.environ.setdefault(v, "1")
 import numpy as np
@@ -31,9 +33,6 @@ import cantera as ct
 HERE = os.path.dirname(os.path.abspath(__file__))
 MECH = os.path.join(HERE, "..", "..", "mechanism", "h2o2")
 XRESID = os.path.join(HERE, "xresid.py")
-AGREE_MAX = 1e-9        # cross-code agreement on shared row types
-RELB_MAX = 5e-2         # converged-state common relative residual
-RTOL = 1e-11            # round-trip gate (xresid refuses above this)
 
 BASE = {"mechanism": MECH, "transport": "mixture-averaged",
         "T": 300, "P_atm": 1, "X": "H2:2,O2:1,AR:3.76"}
@@ -123,7 +122,11 @@ def run_case(kind, spec, tmpdir):
         print(proc.stdout[-2000:])
         print(proc.stderr[-2000:])
         return None, f"xresid exited {proc.returncode}"
-    return json.load(open(res)), None
+    try:
+        with open(res) as stream:
+            return json.load(stream), None
+    except (OSError, ValueError) as exc:
+        return None, f"cannot read xresid report: {exc}"
 
 
 def main():
@@ -150,17 +153,12 @@ def main():
             print(f"FAIL {kind}: {err}")
             failures.append(kind)
             continue
-        agg = data["aggregates"]
-        rt = max(v for chain in data["roundtrip"].values()
-                 for v in chain.values())
-        checks = {
-            "roundtrip": (rt, RTOL),
-            "agreement_A": (agg["agreement_A"], AGREE_MAX),
-            "agreement_B": (agg["agreement_B"], AGREE_MAX),
-            "rel_max_B_native": (agg["rel_max_B_native"], RELB_MAX),
-            "rel_max_B_cantera": (agg["rel_max_B_cantera"], RELB_MAX),
-        }
-        bad = {k: v for k, (v, lim) in checks.items() if v > lim}
+        try:
+            checks, bad = assess_report(data)
+        except InvalidReport as exc:
+            print(f"FAIL {kind}: invalid xresid report: {exc}")
+            failures.append(kind)
+            continue
         line = " ".join(f"{k}={v:.2e}" for k, (v, _) in checks.items())
         if bad:
             print(f"FAIL {kind}: {line} (limits exceeded: {sorted(bad)})")

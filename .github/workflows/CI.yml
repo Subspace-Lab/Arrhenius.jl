@@ -29,3 +29,12 @@ jobs:
           arch: default
       - name: Instantiate and test
         run: julia --project=. -e 'using Pkg; Pkg.instantiate(); Pkg.test()'
+
+  python-gates:
+    name: Python cross-residual report gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Test report gates without solver dependencies
+        run: python3 -m unittest discover -s test/cantera_parity -p 'test_xresid_gates.py' -v
