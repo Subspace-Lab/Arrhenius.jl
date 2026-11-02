@@ -63,7 +63,7 @@ run this integration. First-run elapsed time includes package compilation.
 
 ### Independent Cantera reference
 
-Use Python3.11+ with a Cantera4.0.0a2 build from the exact commit above and its
+Use Python 3.12 (validated with 3.12.3) and a Cantera 4.0.0a2 build from the exact commit above and its
 clean source checkout. A stock3.2 installation is not equivalent. Build setup is
 described by the [pinned upstream instructions](https://github.com/Cantera/cantera/blob/726522be4e2a13454d8415b7ef799d621f665cf3/doc/sphinx/develop/compiling/configure-build.md).
 These commands assume that reference environment is already installed; they do
