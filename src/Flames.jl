@@ -1264,8 +1264,10 @@ function _flame_newton!(f,w; previous=nothing,dt=Inf,maxiters=35,tolerance=1e-8,
         newton_options.damping_acceptance in (:step_or_reduction,:correction_reduction)
     correction_weights = correction_enabled ? _flame_correction_weights(f,u,previous !== nothing,newton_options) : Float64[]
     trial_correction = correction_enabled ? Vector{Float64}(undef,length(u)) : Float64[]
-    current_region = falses(size(u,1)-2,2size(u,2)-1)
-    factored_region = similar(current_region)
+    if region_enabled
+        current_region = falses(size(u,1)-2,2size(u,2)-1)
+        factored_region = similar(current_region)
+    end
     region_valid = false
     iteration = 0
     while unlimited_iterations || iteration < maxiters
