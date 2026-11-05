@@ -4,14 +4,19 @@ import copy
 import contextlib
 import importlib.util
 import io
+import json
 import math
 from pathlib import Path
 import sys
+import tempfile
 import types
 import unittest
 from unittest.mock import patch
 
-from xresid_gates import AGREE_MAX, RELB_MAX, RTOL, InvalidReport, assess_report
+from xresid_gates import (
+    AGREE_MAX, RELB_MAX, RTOL, InvalidReport, aggregate_residuals, assess_report,
+    validate_residual_scales,
+)
 
 
 def report():
@@ -187,6 +192,131 @@ class TestXresidGates(unittest.TestCase):
         before = copy.deepcopy(data)
         assess_report(data)
         self.assertEqual(data, before)
+
+
+class TestResidualAggregation(unittest.TestCase):
+    def row(self, value=0.0):
+        return {
+            "scale": 1.0,
+            "max": dict.fromkeys(("A_native", "A_cantera", "B_native", "B_cantera"), value),
+            "rel": dict.fromkeys(("A_native", "A_cantera", "B_native", "B_cantera"), value),
+        }
+
+    def test_finite_maxima_and_input_preserved(self):
+        rows = [self.row(0.25), self.row(0.5), self.row(None)]
+        rows[0]["rel"]["B_native"] = 0.75
+        agreement = {"A": [0.25, 0.5], "B": [0.5, 0.125]}
+        before = copy.deepcopy((rows, agreement))
+        self.assertEqual(aggregate_residuals(rows, agreement), {
+            "rel_max_A_native": 0.5, "rel_max_A_cantera": 0.5,
+            "rel_max_B_native": 0.75, "rel_max_B_cantera": 0.5,
+            "agreement_A": 0.5, "agreement_B": 0.5,
+        })
+        self.assertEqual((rows, agreement), before)
+
+    def test_empty_and_structurally_absent_stay_none(self):
+        for rows in ([], [self.row(None)]):
+            values = aggregate_residuals(rows, {"A": [], "B": []})
+            self.assertEqual(len(values), 6)
+            self.assertTrue(all(value is None for value in values.values()))
+
+    def test_nan_in_either_row_order_is_rejected(self):
+        for key in self.row()["rel"]:
+            for index in (0, 1):
+                with self.subTest(key=key, index=index):
+                    rows = [self.row(), self.row()]
+                    rows[index]["rel"][key] = math.nan
+                    with self.assertRaisesRegex(InvalidReport, rf"rows\[{index}\].rel.{key}"):
+                        aggregate_residuals(rows, {"A": [0.0], "B": [0.0]})
+
+    def test_agreement_nan_in_either_order_is_rejected(self):
+        for state in ("A", "B"):
+            for values in ([0.0, math.nan], [math.nan, 0.0]):
+                with self.subTest(state=state, values=values):
+                    agreement = {"A": [0.0], "B": [0.0]}
+                    agreement[state] = values
+                    with self.assertRaisesRegex(InvalidReport, f"agreement.{state}"):
+                        aggregate_residuals([self.row()], agreement)
+
+    def test_invalid_raw_maximum_rejected_without_relative_norm(self):
+        for key in self.row()["max"]:
+            for value in (math.nan, math.inf, -math.inf, -1.0):
+                with self.subTest(key=key, value=value):
+                    row = self.row(None)
+                    row["max"][key] = value
+                    with self.assertRaisesRegex(InvalidReport, f"max.{key}"):
+                        aggregate_residuals([row], {"A": [], "B": []})
+
+    def test_invalid_metrics_cannot_be_hidden_by_other_rows(self):
+        for value in (math.inf, -math.inf, -1.0, True, "0", 10**1000):
+            for key in self.row()["rel"]:
+                with self.subTest(key=key, value=value):
+                    rows = [self.row(), self.row()]
+                    rows[1]["rel"][key] = value
+                    with self.assertRaises(InvalidReport):
+                        aggregate_residuals(rows, {"A": [0.0], "B": [0.0]})
+            for state in ("A", "B"):
+                with self.subTest(state=state, value=value):
+                    agreement = {"A": [0.0], "B": [0.0]}
+                    agreement[state].append(value)
+                    with self.assertRaises(InvalidReport):
+                        aggregate_residuals([self.row()], agreement)
+
+    def test_explicit_scales_accept_zero_but_reject_invalid_values(self):
+        scales = {"closure": 1.0, "species/1": 0.0}
+        validate_residual_scales(scales)
+        self.assertEqual(scales, {"closure": 1.0, "species/1": 0.0})
+        for value in (math.nan, math.inf, -math.inf, -1.0, None, True, "0", 10**1000):
+            with self.subTest(value=value):
+                with self.assertRaisesRegex(InvalidReport, "scales.species/1"):
+                    validate_residual_scales({"closure": 1.0, "species/1": value})
+
+    def test_missing_scale_sentinel_and_structural_rows_still_work(self):
+        # A Cantera-only boundary equation can have no native scale. Its
+        # finite maximum / infinity is zero, not invalid residual evidence.
+        row = self.row(None)
+        row["scale"] = math.inf
+        row["max"]["B_cantera"] = 2.0
+        row["rel"]["B_cantera"] = 0.0
+        values = aggregate_residuals([row], {"A": [], "B": []})
+        self.assertEqual(values["rel_max_B_cantera"], 0.0)
+        self.assertIsNone(values["rel_max_B_native"])
+        self.assertIsNone(values["agreement_B"])
+
+
+class TestProducerRefusal(unittest.TestCase):
+    def setUp(self):
+        path = Path(__file__).with_name("xresid.py")
+        spec = importlib.util.spec_from_file_location("xresid_producer_test", path)
+        self.producer = importlib.util.module_from_spec(spec)
+        with patch.dict(sys.modules, {
+            "numpy": types.ModuleType("numpy"),
+            "cantera": types.ModuleType("cantera"),
+        }):
+            spec.loader.exec_module(self.producer)
+
+    def test_refusal_overwrites_stale_success_and_consumer_rejects_it(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "report.json"
+            path.write_text(json.dumps(report()))
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output), self.assertRaises(SystemExit) as exc:
+                self.producer.refuse_invalid_residuals(
+                    InvalidReport("rows[1].rel.B_native must be finite"), "free", path)
+            self.assertEqual(exc.exception.code, 2)
+            data = json.loads(path.read_text())
+            self.assertEqual(data["kind"], "free")
+            self.assertIn("refusal", data)
+            self.assertNotIn("aggregates", data)
+            self.assertIn("rows[1].rel.B_native", data["detail"])
+            self.assertIn("REFUSING", output.getvalue())
+            with self.assertRaisesRegex(InvalidReport, "refusal"):
+                assess_report(data)
+
+    def test_refusal_without_json_still_exits_two(self):
+        with contextlib.redirect_stdout(io.StringIO()), self.assertRaises(SystemExit) as exc:
+            self.producer.refuse_invalid_residuals(InvalidReport("invalid scales"), "free", None)
+        self.assertEqual(exc.exception.code, 2)
 
 
 class TestH2O2GateIntegration(unittest.TestCase):

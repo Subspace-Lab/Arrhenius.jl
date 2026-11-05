@@ -1,4 +1,4 @@
-"""Validate the existing H2/O2 cross-residual gates without solver dependencies."""
+"""Validate cross-residual report values and gates without solver dependencies."""
 
 import math
 from collections.abc import Mapping
@@ -41,6 +41,44 @@ def _error_value(value, path):
     if not finite or value < 0:
         raise InvalidReport(f"{path} must be a finite, nonnegative number")
     return value
+
+
+def validate_residual_scales(scales):
+    """Check explicit native scales; zero is valid before the existing floor.
+
+    Missing scales are handled separately by the producer with an infinity
+    sentinel for unmatched equation types. Do not reject that row-level marker.
+    """
+    for name, value in _mapping(scales, "scales").items():
+        _error_value(value, f"scales.{name}")
+
+
+def aggregate_residuals(rows, agreement):
+    """Validate each contributing value before max can hide a later NaN.
+
+    None means a structurally absent row or unavailable relative norm and is
+    omitted as before; an empty aggregate stays None. Physical residual maxima
+    are checked even when a row has no relative norm. Row-level scale sentinels
+    and the producer's normalization are left unchanged.
+    """
+    aggregates = {}
+    for state in ("A", "B"):
+        for code in ("native", "cantera"):
+            key = f"{state}_{code}"
+            values = []
+            for index, row in enumerate(rows):
+                raw = row["max"][key]
+                if raw is not None:
+                    _error_value(raw, f"rows[{index}].max.{key}")
+                value = row["rel"][key]
+                if value is not None:
+                    values.append(_error_value(value, f"rows[{index}].rel.{key}"))
+            aggregates[f"rel_max_{key}"] = max(values, default=None)
+    for state in ("A", "B"):
+        aggregates[f"agreement_{state}"] = max(
+            (_error_value(value, f"agreement.{state}[{index}]")
+             for index, value in enumerate(agreement[state])), default=None)
+    return aggregates
 
 
 def assess_report(report):

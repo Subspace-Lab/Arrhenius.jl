@@ -22,3 +22,11 @@ python -m unittest discover -s test/cantera_parity -p 'test_xresid_gates.py' -v
 
 These Python checks are separate from the Julia `Pkg.test()` entry point and
 run in their own Linux CI job.
+
+Before reporting aggregates, `xresid.py` checks every non-absent physical
+residual maximum, relative residual, and shared-row agreement value for finite,
+nonnegative values. It also checks explicit native scales before normalization
+(zero is allowed). Invalid data causes exit 2 and, with `--json`, a refusal
+report with a diagnostic field path rather than partial aggregates. Structural
+`None` entries and the infinity sentinel for a missing equation-type scale
+retain their existing meanings; normalization and gate thresholds are unchanged.

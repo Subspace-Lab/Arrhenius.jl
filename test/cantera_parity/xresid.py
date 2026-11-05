@@ -39,6 +39,8 @@ import shlex
 import subprocess
 import sys
 
+from xresid_gates import InvalidReport, aggregate_residuals, validate_residual_scales
+
 for v in ("OPENBLAS_NUM_THREADS", "OMP_NUM_THREADS"):
     os.environ.setdefault(v, "1")
 import numpy as np
@@ -277,6 +279,16 @@ def col(v, width, spec="e"):
     return "-" if v is None else f"{v:.2{spec}}" if spec == "e" else f"{v:.{spec}}".rjust(width)
 
 
+def refuse_invalid_residuals(error, kind, json_path):
+    """Publish a refusal, never partial aggregates that could look successful."""
+    print(f"REFUSING to report residuals: {error}")
+    if json_path:
+        with open(json_path, "w") as stream:
+            json.dump({"kind": kind, "refusal": "invalid residual data",
+                       "detail": str(error)}, stream, indent=1, allow_nan=False)
+    raise SystemExit(2)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("spec")
@@ -389,6 +401,10 @@ def main():
                      "anchor_native": res["anchor"],
                      "dependent_species": res["dependent_species"]}
     scales = (resB if args.scales == "B" else resA)["scales"]
+    try:
+        validate_residual_scales(scales)
+    except InvalidReport as exc:
+        refuse_invalid_residuals(exc, spec["kind"], args.json)
     species_index = {s: k + 1 for k, s in enumerate(species)}
     state = {"A": A, "B": B}
     # Rows whose every term vanishes on the scales state (a species with zero
@@ -457,12 +473,10 @@ def main():
                 a, b = tnat[i, j], types_ct[t][i, j]
                 if a != b and not (a == "closure" and b == "closure_ct"):
                     structural.add(f"{row}@j{j + 1}: native={a} cantera={b}")
-    aggregates = {f"rel_max_{t}_{c}":
-                  max((e["rel"][f"{t}_{c}"] for e in table
-                       if e["rel"][f"{t}_{c}"] is not None), default=None)
-                  for t in ("A", "B") for c in ("native", "cantera")}
-    aggregates.update({f"agreement_{t}": max(agree[t], default=None)
-                       for t in ("A", "B")})
+    try:
+        aggregates = aggregate_residuals(table, agree)
+    except InvalidReport as exc:
+        refuse_invalid_residuals(exc, spec["kind"], args.json)
 
     print("-- residual: max |r| physical; rel = |r|/S (common scales); "
           "agree = |native-CT|/S on shared rows")
