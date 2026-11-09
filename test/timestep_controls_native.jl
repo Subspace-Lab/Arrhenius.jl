@@ -26,7 +26,9 @@ using Arrhenius,Test
     # state, while the auto Jacobian alias must preserve the grid and converge.
     @test compatible.converged && compatible.grid==analytic.grid && all(isfinite,compatible.state)
     @test solve!(FreeFlame(gas;X);time_step_regrid=3).state==reference.state
-    for bad in ((;time_step_growth_factor=.5),(;time_step_growth_factor=Inf),
+    # Cantera TestOnedim.test_time_step_control_option_validation checks NaN
+    # separately from Inf; both native flame families must reject it.
+    for bad in ((;time_step_growth_factor=.5),(;time_step_growth_factor=Inf),(;time_step_growth_factor=NaN),
             (;time_step_growth_strategy=:invalid),(;time_step_regrid=-1),(;jacobian_mode=:unknown))
         @test_throws ArgumentError solve!(FreeFlame(gas;X);bad...)
         @test_throws ArgumentError solve!(CounterflowDiffusionFlame(gas;fuel="H2:1",oxidizer="O2:1",

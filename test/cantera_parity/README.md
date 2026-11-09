@@ -10,3 +10,15 @@ python test/cantera_parity/xresid_h2o2.py
 ```
 
 The first command is a single-kind smoke check; the second covers free, burner, fixed-temperature, and stagnation flames. For recorded states, run `xresid.py SPEC STATE_A.npz STATE_B.npz` or use the adapter with the same arguments.
+
+The H2/O2 regression rejects incomplete reports and non-finite values before
+aggregating round-trip errors or applying its existing numeric limits. Its report
+gate tests use only the Python standard library and can run without NumPy,
+Cantera, or Julia:
+
+```sh
+python -m unittest discover -s test/cantera_parity -p 'test_xresid_gates.py' -v
+```
+
+These Python checks are separate from the Julia `Pkg.test()` entry point and
+run in their own Linux CI job.

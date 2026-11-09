@@ -10,6 +10,9 @@ using Arrhenius, LinearAlgebra, Test
     @test_throws ArgumentError FreeFlame(gas;X,T=NaN)
     @test_throws ArgumentError FreeFlame(gas;X,width=-.1)
     @test_throws ArgumentError FreeFlame(gas;X,grid=[0.,.1,.1,.2,.3])
+    # Cantera TestOnedim.test_grid_check also rejects a descending interval.
+    # Keep five points so the failure cannot be due to native minimum length.
+    @test_throws ArgumentError FreeFlame(gas;X,grid=[0.,.1,.2,.05,.3])
     @test_throws ArgumentError BurnerFlame(gas;X,mdot=0.)
     f = FreeFlame(gas;X,discretization=:finite_difference)
     @test_throws ArgumentError set_transport!(f,:multicomponent)
