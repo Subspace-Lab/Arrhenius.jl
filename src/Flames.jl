@@ -1211,6 +1211,7 @@ function _flame_newton!(f,w; previous=nothing,dt=Inf,maxiters=35,tolerance=1e-8,
         require_positive=false,minimum_iterations=0,loglevel=0,analytic=true,iterations=Ref(0),
         iteration_callback=nothing,newton_options=NewtonPolicyOptions(),step_trace=nothing,cantera_omission=false)
     newton_options=_newton_policy(newton_options,newton_options.cantera_compatible)
+    use_cantera_step_bounds = newton_options.step_bounds === :cantera
     unlimited_iterations=maxiters<=0
     _premixed_stats(f).newton_calls+=1; PREMIXED_STATS.newton_calls+=1
     u = f.state
@@ -1340,7 +1341,7 @@ function _flame_newton!(f,w; previous=nothing,dt=Inf,maxiters=35,tolerance=1e-8,
             # Small negative species values are permitted in Newton iterates;
             # thermodynamic and kinetic evaluations use the nonnegative state.
             low,high = _flame_bounds(f,k,size(u,1))
-            if newton_options.step_bounds === :cantera
+            if use_cantera_step_bounds
                 low,high = k==1 ? _cantera_flame_temperature_bounds(f) :
                     k==size(u,1) ? _cantera_flame_flow_state_bounds(f,u,j) :
                     _cantera_flame_species_bounds()
