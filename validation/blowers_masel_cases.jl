@@ -22,7 +22,7 @@ reference = npzread(joinpath(root,"reference.npz"))
     for shift in (0.,1e7,-1e7)
         changed = copy(h)
         changed[species_index(gas,"H")] += shift
-        rates = wdot!(similar(c),gas.reaction,T,c,s,changed,w;temperature_cache=cache,get_rate_constants=true)
+        rates = wdot!(similar(c),gas.reaction,T,c,s,changed,w;temperature_cache=cache,get_rate_constants=true,pressure=one_atm)
         dh = dot(gas.reaction.vk[:,2],changed)
         @test rates.forward[2] ≈ rate_constant(rate,T,dh) rtol=2e-12
     end

@@ -41,7 +41,7 @@ u0 = vcat(Y0, T0)
     cp_mole, cp_mass = get_cp(gas, T, X, mean_MW)
     h_mole = get_H(gas, T, Y, X)
     S0 = get_S(gas, T, P, X)
-    wdot = wdot_func(gas.reaction, T, C, S0, h_mole)
+    wdot = wdot_func(gas.reaction, T, C, S0, h_mole; pressure=P)
     Ydot = wdot / ρ_mass .* gas.MW
     Tdot = -dot(h_mole, wdot) / ρ_mass / cp_mass
     du .= vcat(Ydot, Tdot)
@@ -57,7 +57,7 @@ end
     cp_mole, cp_mass = get_cp(gas, T, X, mean_MW)
     h_mole = get_H(gas, T, Y, X)
     S0 = get_S(gas, T, P, X)
-    wdot = wdot_func(gas.reaction, T, C, S0, h_mole)
+    wdot = wdot_func(gas.reaction, T, C, S0, h_mole; pressure=P)
     Ydot = wdot / ρ_mass .* gas.MW
     Tdot = -dot(h_mole, wdot) / ρ_mass / cp_mass
     return Tdot

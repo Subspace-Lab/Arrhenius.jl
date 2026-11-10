@@ -267,7 +267,7 @@ function (rhs::_SignedTrialRHS{<:IdealGasReactor})(du,u,p,t)
         work.h_mole[k]*=R*T;work.entropy[k]*=R
     end
     _integer_trial_wdot!(work.wdot,gas.reaction,T,work.C,work.entropy,work.h_mole,work.kinetics;
-        rate_multipliers=reactor.rate_multipliers,reverse_plan=rhs.reverse_plan)
+        rate_multipliers=reactor.rate_multipliers,reverse_plan=rhs.reverse_plan,pressure=P)
     capacity,source=zero(T),zero(T)
     @inbounds for k in 1:gas.n_species
         du[k]=work.wdot[k]*gas.MW[k]/density

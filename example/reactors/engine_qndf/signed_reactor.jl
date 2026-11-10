@@ -23,7 +23,8 @@ function (rhs::SignedEngineRHS)(du,u,p,t)
         work.C[k]=u[k]/(V*gas.MW[k])
     end
     trial_wdot!(work.wdot,gas.reaction,T,work.C,work.entropy,work.h_mole,work.kinetics;
-        rate_multipliers=rhs.model.network.nodes.cylinder.initial.rate_multipliers)
+        rate_multipliers=rhs.model.network.nodes.cylinder.initial.rate_multipliers,
+        pressure=state.pressure)
     energy_correction=0.0
     for k in 1:n
         change=V*(work.wdot[k]-rhs.old_omega[k])

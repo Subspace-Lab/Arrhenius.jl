@@ -61,6 +61,7 @@ include("timestep_controls_native.jl")
 include("catalytic_flames_native.jl")
 include("dusty_gas.jl")
 include("kinetics_cache.jl")
+include("wdot_pressure_native.jl")
 include("mass_action_kernel_optimization.jl")
 include("negative_mass_action.jl")
 include("blowers_masel_native.jl")
@@ -211,7 +212,8 @@ end
     kinetics_workspace = KineticsWorkspace(gas.reaction)
     wdot_buffer = zeros(ns)
     @test wdot!(
-        wdot_buffer, gas.reaction, T0, C, S0, h_mole, kinetics_workspace,
+        wdot_buffer, gas.reaction, T0, C, S0, h_mole, kinetics_workspace;
+        pressure=P,
     ) ≈ wdot
     @test_throws ArgumentError convert_precision(gas, Float32)
     baseline_qdot = copy(wdot!(
@@ -223,6 +225,7 @@ end
         h_mole,
         kinetics_workspace;
         get_qdot=true,
+        pressure=P,
     ))
     log_rate_data = LogRateData(gas.reaction, Float32)
     mixed_qdot = copy(wdot!(
@@ -235,6 +238,7 @@ end
         kinetics_workspace;
         get_qdot=true,
         log_rate_data=log_rate_data,
+        pressure=P,
     ))
     mixed_wdot = gas.reaction.vk * mixed_qdot
     @test all(isfinite, mixed_wdot)
@@ -251,6 +255,7 @@ end
         kinetics_workspace;
         get_qdot=true,
         rate_multipliers=rate_multipliers,
+        pressure=P,
     )
     @test perturbed_qdot[1] ≈ 2.0 * baseline_qdot[1]
     @test_throws DimensionMismatch wdot!(
@@ -262,6 +267,7 @@ end
         h_mole,
         kinetics_workspace;
         rate_multipliers=ones(gas.n_reactions - 1),
+        pressure=P,
     )
     function first_rate_of_progress(multiplier)
         multipliers = ones(typeof(multiplier), gas.n_reactions)
@@ -274,6 +280,7 @@ end
             h_mole;
             get_qdot=true,
             rate_multipliers=multipliers,
+            pressure=P,
         )[1]
     end
     @test ForwardDiff.derivative(first_rate_of_progress, 1.0) ≈ baseline_qdot[1]
@@ -293,7 +300,7 @@ end
         cp_mole, cp_mass = get_cp(gas, T, X, mean_MW)
         h_mole = get_H(gas, T, Y, X)
         S0 = get_S(gas, T, P, X)
-        wdot = wdot_func(gas.reaction, T, C, S0, h_mole)
+        wdot = wdot_func(gas.reaction, T, C, S0, h_mole; pressure=P)
         Tdot = -dot(h_mole, wdot) / ρ_mass / cp_mass
         return Tdot
     end

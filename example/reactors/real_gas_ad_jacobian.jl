@@ -74,8 +74,14 @@ function _shocktube_ad_jacobian(reactor,::Val{N},trial_policy::P) where {N,P<:Sh
             @inbounds for k in 1:n
                 work.C[k]=_trial_concentration(trial_policy,Y[k])*reactor.density/gas.MW[k]
             end
+            # Thermodynamic pressure of the trial state: P = rho*R*T*sum(Y/MW),
+            # the same expression Arrhenius._reactor_tpρ uses for this reactor.
+            # The trial mass fractions are clipped exactly like the trial
+            # concentrations below, so the pressure follows the clipped state.
+            trial_pressure=reactor.density*R*T*sum(
+                _trial_concentration(trial_policy,Y[k])/gas.MW[k] for k in 1:n)
             _trial_wdot!(trial_policy,work.wdot,gas.reaction,T,work.C,floats.entropy,floats.h_mole,work.kinetics;
-                temperature_cache=cache,rate_multipliers=reactor.rate_multipliers)
+                temperature_cache=cache,rate_multipliers=reactor.rate_multipliers,pressure=trial_pressure)
             capacity,source=zero(eltype(Y)),zero(eltype(Y))
             @inbounds for k in 1:n
                 du[k]=work.wdot[k]*gas.MW[k]/reactor.density
@@ -118,8 +124,12 @@ function _shocktube_ad_jacobian(reactor,::Val{N},trial_policy::P) where {N,P<:Sh
         # Only T-dependent Arrhenius and reference-Kc factors enter this cache.
         # Composition, EOS pressure, colliders, falloff and mass action are
         # reevaluated using dual values in composition_rhs.
+        # Thermodynamic pressure of the state: P = rho*R*T*sum(Y/MW), the
+        # constant-volume expression Arrhenius._reactor_tpρ uses for this
+        # reactor.
+        state_pressure=reactor.density*R*T*sum(state[k]/gas.MW[k] for k in 1:n)
         wdot!(floats.wdot,gas.reaction,T,floats.C,s,h,floats.kinetics;
-            temperature_cache=cache,rate_multipliers=reactor.rate_multipliers)
+            temperature_cache=cache,rate_multipliers=reactor.rate_multipliers,pressure=state_pressure)
         ForwardDiff.jacobian!(view(J,:,1:n),composition_rhs,out,x,cfg)
         ForwardDiff.jacobian!(view(J,:,n+1:n+1),temperature_rhs,out,temp,tcfg)
         nothing

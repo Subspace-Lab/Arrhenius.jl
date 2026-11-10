@@ -16,7 +16,7 @@ using Arrhenius, LinearAlgebra, Test
     workspace=KineticsWorkspace(reaction)
     partial=KineticsWorkspace(reaction)
     out=fill(-123.,gas.n_species)
-    result=wdot!(out,reaction,T,C,S,h,workspace;get_rate_constants=true)
+    result=wdot!(out,reaction,T,C,S,h,workspace;get_rate_constants=true,pressure=P)
     @test keys(result)==(:forward,:reverse,:equilibrium)
     @test result.forward===workspace.kf
     @test result.reverse===workspace.kr
@@ -37,7 +37,7 @@ using Arrhenius, LinearAlgebra, Test
     @test partial.equilibrium_constants[reaction.is_reversible]==reference[3][reaction.is_reversible]
     @test isnan(partial.equilibrium_constants[1])
     # A public query always repairs every equilibrium entry in the same workspace.
-    complete=wdot!(out,reaction,T,C,S,h,partial;get_rate_constants=true)
+    complete=wdot!(out,reaction,T,C,S,h,partial;get_rate_constants=true,pressure=P)
     @test complete.equilibrium==reference[3]
 
     cache=Arrhenius._KineticsTemperatureCache(reaction)
@@ -47,25 +47,25 @@ using Arrhenius, LinearAlgebra, Test
     @test partial.equilibrium_constants==reference[3]
     fill!(partial.equilibrium_constants,NaN)
     Arrhenius._rate_factors!(reaction,T,C,S,h,partial,plan)
-    complete=wdot!(out,reaction,T,C,S,h,partial;temperature_cache=cache,get_rate_constants=true)
+    complete=wdot!(out,reaction,T,C,S,h,partial;temperature_cache=cache,get_rate_constants=true,pressure=P)
     @test complete.equilibrium==reference[3]
     changed_h=copy(h);changed_h[1]+=1e6
     cache.temperature=NaN
     Arrhenius._rate_factors!(reaction,T,C,S,changed_h,partial,plan;temperature_cache=cache)
-    fresh=wdot!(out,reaction,T,C,S,changed_h,workspace;get_rate_constants=true)
+    fresh=wdot!(out,reaction,T,C,S,changed_h,workspace;get_rate_constants=true,pressure=P)
     @test cache.temperature==T
     @test partial.kf==fresh.forward
     @test partial.kr==fresh.reverse
     @test partial.equilibrium_constants==fresh.equilibrium
 
     # Return aliases and flag precedence remain the original public behavior.
-    both=wdot!(out,reaction,T,C,S,h,workspace;get_qdot=true,get_rate_constants=true)
+    both=wdot!(out,reaction,T,C,S,h,workspace;get_qdot=true,get_rate_constants=true,pressure=P)
     @test both.equilibrium===workspace.equilibrium_constants
-    progress=wdot!(out,reaction,T,C,S,h,workspace;get_qdot=true)
+    progress=wdot!(out,reaction,T,C,S,h,workspace;get_qdot=true,pressure=P)
     @test progress===workspace.rates_of_progress
     expected_source=reaction.vk*copy(progress)
     @test all(==(-123.),out)
-    source=wdot!(out,reaction,T,C,S,h,workspace)
+    source=wdot!(out,reaction,T,C,S,h,workspace;pressure=P)
     @test source===out
     @test source==expected_source
 end
@@ -76,6 +76,7 @@ end
     reaction.is_reversible[1]=false
     plan=Arrhenius._ReversibleRatePlan(reaction)
     T=1000.;C=fill(.01,gas.n_species);S=collect(1.:gas.n_species);h=1e6S
+    P=one_atm
     work=KineticsWorkspace(reaction)
     Arrhenius._rate_factors!(reaction,T,C,S,h,work,plan)
     snapshot=[copy(getfield(work,i)) for i in 1:fieldcount(typeof(work))]
@@ -95,7 +96,7 @@ end
             rebuilt=Arrhenius._ReversibleRatePlan(reaction)
             current=KineticsWorkspace(reaction)
             @test Arrhenius._rate_factors!(reaction,T,C,S,h,current,rebuilt)===nothing
-            full=wdot!(zeros(gas.n_species),reaction,T,C,S,h,KineticsWorkspace(reaction);get_rate_constants=true)
+            full=wdot!(zeros(gas.n_species),reaction,T,C,S,h,KineticsWorkspace(reaction);get_rate_constants=true,pressure=P)
             @test current.kf==full.forward
             @test current.kr==full.reverse
         finally
