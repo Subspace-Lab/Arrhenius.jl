@@ -69,6 +69,7 @@ include("imported_gas_native.jl")
 include("ion_transport_native.jl")
 include("ionized_flames_native.jl")
 include("ion_conservative_native.jl")
+include("tools/impact_parsing_test.jl")
 
 @testset "sidecar provenance" begin
     mechanism, stream = mktemp()
