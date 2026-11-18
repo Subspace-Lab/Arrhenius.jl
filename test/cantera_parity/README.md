@@ -30,3 +30,13 @@ nonnegative values. It also checks explicit native scales before normalization
 report with a diagnostic field path rather than partial aggregates. Structural
 `None` entries and the infinity sentinel for a missing equation-type scale
 retain their existing meanings; normalization and gate thresholds are unchanged.
+
+## Free flame diffusion gradient basis
+
+`flux_gradient_mass.jl` ports [`TestFreeFlame.test_flux_gradient_mass`](https://github.com/Cantera/cantera/blob/726522be4e2a13454d8415b7ef799d621f665cf3/test/python/test_onedim.py) from Cantera 4.0.0a2. It runs in `Pkg.test()` with frozen [mechanism and transport data](../data/cantera_flux_gradient_mass/) and needs no Cantera runtime. It solves on a molar gradient basis, then continues the same flame on a mass gradient basis. The speeds must differ by no more than 10% of the mass-basis speed and must be unequal.
+
+Run the single case from the repository root:
+
+```sh
+julia --project=. test/cantera_parity/flux_gradient_mass.jl
+```
