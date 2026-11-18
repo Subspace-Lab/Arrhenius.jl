@@ -40,3 +40,11 @@ Run the single case from the repository root:
 ```sh
 julia --project=. test/cantera_parity/flux_gradient_mass.jl
 ```
+
+## Burner flame blowoff
+
+`burner_blowoff.jl` ports [`TestBurnerFlame.test_blowoff`](https://github.com/Cantera/cantera/blob/726522be4e2a13454d8415b7ef799d621f665cf3/test/python/test_onedim.py#L2001) from Cantera 4.0.0a2. It reuses the frozen [10-species mechanism and transport data](../data/cantera_flux_gradient_mass/) and records the Cantera inlet and outlet values. `Pkg.test()` checks the original within-flame endpoint criteria for temperature, velocity, and each species mass fraction for both the recorded reference and the native solution. The test needs no Cantera runtime.
+
+```sh
+julia --project=. test/cantera_parity/burner_blowoff.jl
+```
