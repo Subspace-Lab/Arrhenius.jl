@@ -16,8 +16,8 @@ using Arrhenius, Test, LinearAlgebra
             C = P/(R*T) .* X
             H = R*T .* cal_h_RT(gas,T,P,X)
             S = R .* cal_s0_R(gas,T,P,X)
-            uncached .= wdot!(production,gas.reaction,T,C,S,H,w;get_qdot=true)
-            cached .= wdot!(production,gas.reaction,T,C,S,H,w;get_qdot=true,temperature_cache=cache)
+            uncached .= wdot!(production,gas.reaction,T,C,S,H,w;get_qdot=true,pressure=P)
+            cached .= wdot!(production,gas.reaction,T,C,S,H,w;get_qdot=true,temperature_cache=cache,pressure=P)
             @test cached ≈ uncached rtol=1e-13 atol=1e-20
         end
     end

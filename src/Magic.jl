@@ -79,7 +79,7 @@ function set_states(gas::Solution, T, P, Y)
     cp_mole, cp_mass = get_cp(gas, T, X, mean_MW)
     h_mole = get_H(gas, T, Y, X)
     S0 = get_S(gas, T, P, X)
-    wdot = wdot_func(gas.reaction, T, C, S0, h_mole)
+    wdot = wdot_func(gas.reaction, T, C, S0, h_mole; pressure=P)
     return wdot
 end
 export set_states
