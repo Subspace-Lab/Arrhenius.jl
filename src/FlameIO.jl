@@ -106,14 +106,15 @@ function _restore_flame_snapshot!(f::AbstractPremixedFlame,path::AbstractString)
     z,u,Y = vec(arrays["grid"]),arrays["state"],vec(arrays["inlet_Y"])
     n,N = f.gas.n_species,length(z)
     size(u) == (n+2,N) && length(Y)==n || throw(DimensionMismatch("snapshot state dimensions do not match"))
-    N>=5 && all(isfinite,z) && all(>(0),diff(z)) && all(isfinite,u) &&
-        all(t->.2<=t<=6,@view(u[1,:])) && minimum(@view(u[2:n+1,:]))>=-1e-7 &&
-        all(>(0),@view(u[end,:])) || throw(ArgumentError("invalid snapshot state or grid"))
-    all(isfinite,Y) && all(>=(0),Y) && isapprox(sum(Y),1;atol=1e-10) || throw(ArgumentError("invalid snapshot inlet composition"))
     conditions = vec(arrays["conditions"])
     length(conditions)==4 && all(isfinite,conditions) && conditions[1]>0 &&
-        200<=conditions[2]<=6000 && isinteger(conditions[3]) && 2<=conditions[3]<N ||
+        5<conditions[2]<=6000 && isinteger(conditions[3]) && 2<=conditions[3]<N ||
         throw(ArgumentError("invalid snapshot boundary conditions"))
+    lower = _flame_temperature_lower_bound(conditions[2])/1000
+    N>=5 && all(isfinite,z) && all(>(0),diff(z)) && all(isfinite,u) &&
+        all(t->lower<=t<=6,@view(u[1,:])) && minimum(@view(u[2:n+1,:]))>=-1e-7 &&
+        all(>(0),@view(u[end,:])) || throw(ArgumentError("invalid snapshot state or grid"))
+    all(isfinite,Y) && all(>=(0),Y) && isapprox(sum(Y),1;atol=1e-10) || throw(ArgumentError("invalid snapshot inlet composition"))
     discretization = haskey(arrays,"discretization_utf8") ? Symbol(text("discretization_utf8")) : :finite_difference
     discretization in (:finite_difference,:conservative) || throw(ArgumentError("invalid snapshot discretization"))
     f.grid,f.state,f.inlet_Y = z,u,Y
@@ -272,8 +273,9 @@ function set_initial_guess!(f::AbstractPremixedFlame, table::NamedTuple)
     # density from the shifted temperature, data composition and pressure, as
     # Cantera's flow domain does on restore.
     T = T .+ (f.inlet_temperature - T[1])
-    all(t -> isfinite(t) && 200 <= t <= 6000, T) ||
-        throw(ArgumentError("restart temperature profile must remain within 200–6000 K after the inlet shift"))
+    lower = _flame_temperature_lower_bound(f)
+    all(t -> lower <= t <= 6000, T) ||
+        throw(ArgumentError("restart temperature profile must remain within $(lower)–6000 K after the inlet shift"))
     mdot = if f isa FreeFlame
         inverseMW = vec(transpose(Y) * (1 ./ gas.MW))
         mean_MW = 1 ./ inverseMW

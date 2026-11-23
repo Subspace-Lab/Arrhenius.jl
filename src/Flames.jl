@@ -67,16 +67,17 @@ function FreeFlame(gas::Solution; T=300.0, P=one_atm, X, width=0.03, grid=nothin
     discretization = Symbol(discretization)
     discretization in (:finite_difference,:conservative) ||
         throw(ArgumentError("discretization must be :finite_difference or :conservative"))
-    isfinite(T) && 200 <= T <= 6000 && isfinite(P) && P > 0 ||
-        throw(ArgumentError("finite inlet temperature in 200–6000 K and positive pressure required"))
     if gas.trans.model == :ionized_gas
         Symbol(transport_model)==:ionized_gas && !soret && multicomponent_data===nothing && flux_gradient_basis==:mole ||
             throw(ArgumentError("ionized flames require ionized transport with mole gradients and no Soret or external transport data"))
         return IonizedFlame(gas;kind=:free,T,P,X,width,grid,discretization)
     end
+    5 < T <= 6000 && isfinite(P) && P > 0 ||
+        throw(ArgumentError("inlet temperature must satisfy 5 < T <= 6000 K and pressure must be finite and positive"))
     gas.trans.poly_order == 5 || throw(ArgumentError("regenerate the sidecar to include native transport fits"))
     x = mole_fractions(gas,X)
-    eq = equilibrate(gas; T, P, X=x, mode=:HP)
+    eq = equilibrate(gas; T, P, X=x, mode=:HP,
+        temperature_bounds=(_flame_temperature_lower_bound(T), 6000.0))
     eq.T > T+10 || throw(ArgumentError("the inlet does not support an exothermic adiabatic flame"))
     z = isnothing(grid) ? width .* [0,.2,.3,.35,.4,.5,.6,.8,1] : Float64.(grid)
     length(z) >= 5 && all(isfinite,z) && all(>(0),diff(z)) ||
@@ -204,8 +205,9 @@ function set_temperature_profile!(f::BurnerFlame,positions,temperatures;
     z isa AbstractVector && T isa AbstractVector ||
         throw(ArgumentError("profile positions and temperatures must be vectors"))
     length(z) == length(T) && length(z) >= 2 || throw(DimensionMismatch("at least two position/temperature pairs required"))
-    all(isfinite,z) && all(>(0),diff(z)) && all(t->isfinite(t)&&200<=t<=6000,T) ||
-        throw(ArgumentError("profile requires increasing positions and temperatures in 200–6000 K"))
+    lower = _flame_temperature_lower_bound(f)
+    all(isfinite,z) && all(>(0),diff(z)) && all(t->lower<=t<=6000,T) ||
+        throw(ArgumentError("profile requires increasing positions and temperatures in $(lower)–6000 K"))
     if relative
         z = f.grid[1] .+ z .* (f.grid[end]-f.grid[1])
     end
@@ -862,14 +864,20 @@ _flame_step_sequencing(f)=_conservative_flame(f)
 _flame_checkpoint_steady(f)=_conservative_flame(f)
 _flame_reuse_trial(f)=_conservative_flame(f)
 _flame_refine_threshold(f,k)=k==1 ? sqrt(eps(Float64))/1000 : sqrt(eps(Float64))
+# Cantera Inlet1D::setTemperature leaves 5 K of room below a cold inlet.
+_flame_temperature_lower_bound(f) = 200.0
+_flame_temperature_lower_bound(T::Real) = T <= 200.0 ? Float64(T) - 5.0 : 200.0
+_flame_temperature_lower_bound(f::Union{FreeFlame,BurnerFlame}) =
+    _flame_temperature_lower_bound(f.inlet_temperature)
 function _flame_bounds(f,k,B)
-    low=k==1 ? .2 : k==B ? 1e-6 : -1e-7
+    low=k==1 ? _flame_temperature_lower_bound(f)/1000 : k==B ? 1e-6 : -1e-7
     high=k==1 ? 6.0 : k==B ? 100.0 : 1.00001
     return low,high
 end
 # IdealGasThermo stores each species maximum temperature in the third Trange column.
 # Cantera bounds T by twice the minimum species maximum.
-_cantera_flame_temperature_bounds(f) = (0.2,2*minimum(@view(f.gas.thermo.Trange[:,end]))/1000)
+_cantera_flame_temperature_bounds(f) =
+    (_flame_temperature_lower_bound(f)/1000,2*minimum(@view(f.gas.thermo.Trange[:,end]))/1000)
 _cantera_flame_species_bounds() = (-1e-7,1e5)
 _cantera_flame_velocity_bounds() = (-1e20,1e20)
 @inline _cantera_flame_flow_state_bounds(f,u,j) =
@@ -1789,7 +1797,8 @@ struct FlameDomainTooNarrow <: Exception end
 function _fresh_analytic_guess!(f::FreeFlame, z = f.grid; cantera_compatible=true)
     x = f.inlet_Y ./ f.gas.MW
     x ./= sum(x)
-    eq = equilibrate(f.gas; T=f.inlet_temperature, P=f.pressure, X=x, mode=:HP)
+    eq = equilibrate(f.gas; T=f.inlet_temperature, P=f.pressure, X=x, mode=:HP,
+        temperature_bounds=(_flame_temperature_lower_bound(f), 6000.0))
     T0, y = f.inlet_temperature, f.inlet_Y
     L = z[end] - z[1]
     mdot = f.state[end, 1]
@@ -1875,7 +1884,8 @@ end
 function _fresh_analytic_guess!(f::BurnerFlame, z = f.grid; cantera_compatible=true)
     x = f.inlet_Y ./ f.gas.MW
     x ./= sum(x)
-    eq = equilibrate(f.gas; T=f.inlet_temperature, P=f.pressure, X=x, mode=:HP)
+    eq = equilibrate(f.gas; T=f.inlet_temperature, P=f.pressure, X=x, mode=:HP,
+        temperature_bounds=(_flame_temperature_lower_bound(f), 6000.0))
     znew = collect(Float64, z)
     L = znew[end] - znew[1]
     state = Matrix{Float64}(undef, size(f.state, 1), length(znew))
