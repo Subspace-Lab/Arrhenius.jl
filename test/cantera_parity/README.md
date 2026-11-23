@@ -41,6 +41,16 @@ Run the single case from the repository root:
 julia --project=. test/cantera_parity/flux_gradient_mass.jl
 ```
 
+## Free flame at a 180 K inlet
+
+`freeflame_low_temperature.jl` ports [`TestFreeFlame.test_mixture_averaged_case9`](https://github.com/Cantera/cantera/blob/726522be4e2a13454d8415b7ef799d621f665cf3/test/python/test_onedim.py#L620-L622) from Cantera 4.0.0a2. It runs in `Pkg.test()` using the same frozen [mechanism and transport data](../data/cantera_flux_gradient_mass/). On the fixed nine-point grid, it checks convergence and compares mass flux at every point with the inlet mass flux for each native and recorded reference solution. The 180, 200, and 300 K inlets exercise Newton temperature lower bounds of 175, 195, and 200 K, respectively.
+
+The 180 K case covers both solver modes, CSV initial guesses, and native snapshot restores. A dilute 100 K mixture exercises free- and burner-flame initialization when the equilibrium product temperature is below 200 K. Running the regression requires only Julia.
+
+```sh
+julia --project=. test/cantera_parity/freeflame_low_temperature.jl
+```
+
 ## Burner flame blowoff
 
 `burner_blowoff.jl` ports [`TestBurnerFlame.test_blowoff`](https://github.com/Cantera/cantera/blob/726522be4e2a13454d8415b7ef799d621f665cf3/test/python/test_onedim.py#L2001) from Cantera 4.0.0a2. It reuses the frozen [10-species mechanism and transport data](../data/cantera_flux_gradient_mass/) and records the Cantera inlet and outlet values. `Pkg.test()` checks the original within-flame endpoint criteria for temperature, velocity, and each species mass fraction for both the recorded reference and the native solution. The test needs no Cantera runtime.
