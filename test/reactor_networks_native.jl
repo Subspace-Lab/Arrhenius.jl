@@ -143,3 +143,30 @@ end
     @test isapprox(rhs.workspaces[1].kinetics.rates_of_progress[143],
         633.08866652485551; rtol=1e-10)
 end
+
+@testset "constant reservoir inlet does not mask outlet species Jacobian" begin
+    # Existing Cantera TestSteadySolver.test_jacobian fixture (#81).
+    # Preserve its full species-block absolute/relative criterion.
+    gas = CreateSolution(joinpath(@__DIR__, "cantera_parity", "fixtures",
+        "cantera-726522be", "h2o2.yaml"); phase="ohmech")
+    mixture = Dict("H2"=>2.4, "O2"=>1.0, "N2"=>3.76)
+    eq = equilibrate(gas; T=500.0, P=20one_atm, X=mixture, mode=:HP)
+    feed = Reservoir(gas; temperature=500.0, pressure=20one_atm, mole_fractions=mixture)
+    sink = Reservoir(gas; temperature=eq.T, pressure=20one_atm, mole_fractions=eq.X)
+    vessel = WellStirredReactor(gas; temperature=eq.T, pressure=20one_atm,
+        mole_fractions=eq.X, volume=1e-3, rate_multipliers=zeros(gas.n_reactions))
+    network = ReactorNetwork((feed=feed, vessel=vessel, sink=sink); flows=(
+        MassFlowController(:feed,:vessel; mdot=120.0),
+        MassFlowController(:vessel,:sink; mdot=120.0)))
+    rhs, u = network_rhs(network), network_state(network)
+    J = zeros(length(u), length(u))
+    network_jacobian!(J, u, rhs)
+    ns = gas.n_species
+    mass = sum(@view u[1:ns])
+    for j in 1:ns, i in 1:ns
+        scale = gas.MW[j] / gas.MW[i]
+        actual = J[i,j] * scale
+        expected = 120 / mass * (i == j ? u[i]/mass - 1 : u[i]/mass * scale)
+        @test abs(actual - expected) <= max(1e-12, 5e-4 * abs(expected))
+    end
+end

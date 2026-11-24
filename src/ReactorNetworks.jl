@@ -230,6 +230,8 @@ struct NetworkRHS{N,S}
     base::Vector{Float64}
     plus::Vector{Float64}
     minus::Vector{Float64}
+    constant_inlets::Vector{Bool}
+    species_sample::Vector{Float64}
 end
 
 "Prepare an in-place native network RHS. Each concurrent solve needs its own instance."
@@ -243,10 +245,14 @@ function network_rhs(network::ReactorNetwork)
     workspaces = [ReactorWorkspace(node.initial.gas, Float64) for node in network.nodes]
     activities = [zeros(node isa WellStirredReactor && node.chemistry ? node.initial.gas.n_species : 0)
                   for node in network.nodes]
+    constant_inlets = Bool[device isa MassFlowController && device.mdot isa Real &&
+        network.offsets[up] == 0 && network.offsets[down] > 0
+        for (device, (up, down)) in zip(network.flows, network.flow_endpoints)]
     return NetworkRHS(network, states, collect(values(states)), workspaces, activities, zeros(length(network.flows)),
         zeros(length(network.walls)), zeros(length(network.nodes)), zeros(length(network.nodes)),
         network_state(network), zeros(length(network.initial_state)),
-        zeros(length(network.initial_state)), zeros(length(network.initial_state)))
+        zeros(length(network.initial_state)), zeros(length(network.initial_state)),
+        constant_inlets, zeros(any(constant_inlets) ? length(network.initial_state) : 0))
 end
 
 _network_signal(value::Real, states, t) = value
@@ -311,6 +317,12 @@ function _update_network_states!(rhs, u; volumes=nothing)
 end
 
 function (rhs::NetworkRHS)(du, u, p, t; volumes=nothing)
+    return _network_rhs!(du, u, p, t, rhs, nothing; volumes)
+end
+
+# The optional buffer excludes only state-independent reservoir inlets from
+# species FD samples. Physical du stays complete until energy is evaluated.
+function _network_rhs!(du, u, p, t, rhs::NetworkRHS, species_sample; volumes=nothing)
     network = rhs.network
     length(du) == length(u) || throw(DimensionMismatch("network derivative length mismatch"))
     fill!(du, 0)
@@ -336,6 +348,7 @@ function (rhs::NetworkRHS)(du, u, p, t; volumes=nothing)
             end
         end
     end
+    species_sample === nothing || copyto!(species_sample, du)
     _network_foreach(network.flows) do device, i
         up, down = network.flow_endpoints[i]
         source, target = rhs.state_vector[up], rhs.state_vector[down]
@@ -354,6 +367,8 @@ function (rhs::NetworkRHS)(du, u, p, t; volumes=nothing)
         if upstream_offset > 0
             @inbounds for k in eachindex(source.mass_fractions)
                 du[upstream_offset+k-1] -= rate * source.mass_fractions[k]
+                species_sample === nothing ||
+                    (species_sample[upstream_offset+k-1] -= rate * source.mass_fractions[k])
             end
             rhs.energy_flux[up] -= rate * source.enthalpy
         end
@@ -361,6 +376,9 @@ function (rhs::NetworkRHS)(du, u, p, t; volumes=nothing)
             @inbounds for k in eachindex(source.mass_fractions)
                 j = network.species_maps[i][k]
                 j > 0 && (du[downstream_offset+j-1] += rate * source.mass_fractions[k])
+                if species_sample !== nothing && !rhs.constant_inlets[i] && j > 0
+                    species_sample[downstream_offset+j-1] += rate * source.mass_fractions[k]
+                end
             end
             rhs.energy_flux[down] += rate * source.enthalpy
         end
@@ -388,16 +406,26 @@ function (rhs::NetworkRHS)(du, u, p, t; volumes=nothing)
         else
             du[offset+gas.n_species] = (rhs.energy_flux[i] - composition_energy) / (state.mass * state.cv)
         end
+        if species_sample !== nothing
+            @inbounds for k in 1:gas.n_species
+                du[offset+k-1] = species_sample[offset+k-1]
+            end
+        end
     end
     return nothing
 end
 
 "Dense second-order finite-difference Jacobian, including all device/state couplings."
 function network_jacobian!(J, u, rhs::NetworkRHS, t=0.0)
+    species_sample = isempty(rhs.species_sample) ? nothing : rhs.species_sample
+    return _network_jacobian!(J, u, rhs, t, species_sample)
+end
+
+function _network_jacobian!(J, u, rhs::NetworkRHS, t, species_sample::S) where S
     n = length(u)
     size(J) == (n, n) || throw(DimensionMismatch("invalid network Jacobian dimensions"))
     copyto!(rhs.jac_state, u)
-    rhs(rhs.base, u, nothing, t)
+    _network_rhs!(rhs.base, u, nothing, t, rhs, species_sample)
     relative_step = cbrt(eps(Float64))
     _network_foreach(values(rhs.network.nodes)) do node, node_index
         offset = rhs.network.offsets[node_index]
@@ -407,16 +435,16 @@ function network_jacobian!(J, u, rhs::NetworkRHS, t=0.0)
             step = relative_step * max(abs(u[j]), j == offset+node.initial.gas.n_species ? 1.0 : mass_scale)
             rhs.jac_state[j] = u[j] + step
             step = rhs.jac_state[j] - u[j]
-            rhs(rhs.plus, rhs.jac_state, nothing, t)
+            _network_rhs!(rhs.plus, rhs.jac_state, nothing, t, rhs, species_sample)
             if u[j] >= step
                 rhs.jac_state[j] = u[j] - step
-                rhs(rhs.minus, rhs.jac_state, nothing, t)
+                _network_rhs!(rhs.minus, rhs.jac_state, nothing, t, rhs, species_sample)
                 @inbounds for i in 1:n
                     J[i, j] = (rhs.plus[i] - rhs.minus[i]) / (2step)
                 end
             else
                 rhs.jac_state[j] = u[j] + 2step
-                rhs(rhs.minus, rhs.jac_state, nothing, t)
+                _network_rhs!(rhs.minus, rhs.jac_state, nothing, t, rhs, species_sample)
                 @inbounds for i in 1:n
                     J[i, j] = (-3rhs.base[i] + 4rhs.plus[i] - rhs.minus[i]) / (2step)
                 end
