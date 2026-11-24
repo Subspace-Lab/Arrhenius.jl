@@ -232,6 +232,10 @@ struct NetworkRHS{N,S}
     minus::Vector{Float64}
     constant_inlets::Vector{Bool}
     species_sample::Vector{Float64}
+    callback_inlets::Vector{Bool}
+    callback_base::Vector{Float64}
+    callback_plus::Vector{Float64}
+    callback_minus::Vector{Float64}
 end
 
 "Prepare an in-place native network RHS. Each concurrent solve needs its own instance."
@@ -248,11 +252,16 @@ function network_rhs(network::ReactorNetwork)
     constant_inlets = Bool[device isa MassFlowController && device.mdot isa Real &&
         network.offsets[up] == 0 && network.offsets[down] > 0
         for (device, (up, down)) in zip(network.flows, network.flow_endpoints)]
+    callback_inlets = Bool[device isa MassFlowController && !(device.mdot isa Real) &&
+        network.offsets[up] == 0 && network.offsets[down] > 0
+        for (device, (up, down)) in zip(network.flows, network.flow_endpoints)]
+    callback_count = any(callback_inlets) ? length(network.flows) : 0
     return NetworkRHS(network, states, collect(values(states)), workspaces, activities, zeros(length(network.flows)),
         zeros(length(network.walls)), zeros(length(network.nodes)), zeros(length(network.nodes)),
         network_state(network), zeros(length(network.initial_state)),
         zeros(length(network.initial_state)), zeros(length(network.initial_state)),
-        constant_inlets, zeros(any(constant_inlets) ? length(network.initial_state) : 0))
+        constant_inlets, zeros(any(constant_inlets) || any(callback_inlets) ? length(network.initial_state) : 0),
+        callback_inlets, zeros(callback_count), zeros(callback_count), zeros(callback_count))
 end
 
 _network_signal(value::Real, states, t) = value
@@ -376,7 +385,7 @@ function _network_rhs!(du, u, p, t, rhs::NetworkRHS, species_sample; volumes=not
             @inbounds for k in eachindex(source.mass_fractions)
                 j = network.species_maps[i][k]
                 j > 0 && (du[downstream_offset+j-1] += rate * source.mass_fractions[k])
-                if species_sample !== nothing && !rhs.constant_inlets[i] && j > 0
+                if species_sample !== nothing && !rhs.constant_inlets[i] && !rhs.callback_inlets[i] && j > 0
                     species_sample[downstream_offset+j-1] += rate * source.mass_fractions[k]
                 end
             end
@@ -426,6 +435,7 @@ function _network_jacobian!(J, u, rhs::NetworkRHS, t, species_sample::S) where S
     size(J) == (n, n) || throw(DimensionMismatch("invalid network Jacobian dimensions"))
     copyto!(rhs.jac_state, u)
     _network_rhs!(rhs.base, u, nothing, t, rhs, species_sample)
+    isempty(rhs.callback_base) || copyto!(rhs.callback_base, rhs.mass_flow_rates)
     relative_step = cbrt(eps(Float64))
     _network_foreach(values(rhs.network.nodes)) do node, node_index
         offset = rhs.network.offsets[node_index]
@@ -436,20 +446,43 @@ function _network_jacobian!(J, u, rhs::NetworkRHS, t, species_sample::S) where S
             rhs.jac_state[j] = u[j] + step
             step = rhs.jac_state[j] - u[j]
             _network_rhs!(rhs.plus, rhs.jac_state, nothing, t, rhs, species_sample)
+            isempty(rhs.callback_plus) || copyto!(rhs.callback_plus, rhs.mass_flow_rates)
             if u[j] >= step
                 rhs.jac_state[j] = u[j] - step
                 _network_rhs!(rhs.minus, rhs.jac_state, nothing, t, rhs, species_sample)
+                isempty(rhs.callback_minus) || copyto!(rhs.callback_minus, rhs.mass_flow_rates)
                 @inbounds for i in 1:n
                     J[i, j] = (rhs.plus[i] - rhs.minus[i]) / (2step)
                 end
             else
                 rhs.jac_state[j] = u[j] + 2step
                 _network_rhs!(rhs.minus, rhs.jac_state, nothing, t, rhs, species_sample)
+                isempty(rhs.callback_minus) || copyto!(rhs.callback_minus, rhs.mass_flow_rates)
                 @inbounds for i in 1:n
                     J[i, j] = (-3rhs.base[i] + 4rhs.plus[i] - rhs.minus[i]) / (2step)
                 end
             end
+            isempty(rhs.callback_base) ||
+                _network_callback_column!(J, j, rhs, step, u[j] >= step)
             rhs.jac_state[j] = u[j]
+        end
+    end
+    return nothing
+end
+
+# Use the original sampled, clipped flow: never reevaluate or infer a constant callback.
+# Only fixed reservoir composition is factored; physical energy rows use the full RHS.
+function _network_callback_column!(J, j, rhs, step, central)
+    for i in eachindex(rhs.callback_inlets)
+        rhs.callback_inlets[i] || continue
+        dq = central ? (rhs.callback_plus[i] - rhs.callback_minus[i]) / (2step) :
+            (-3rhs.callback_base[i] + 4rhs.callback_plus[i] - rhs.callback_minus[i]) / (2step)
+        up, down = rhs.network.flow_endpoints[i]
+        offset = rhs.network.offsets[down]
+        Y = rhs.state_vector[up].mass_fractions
+        for k in eachindex(Y)
+            mapped = rhs.network.species_maps[i][k]
+            mapped > 0 && (J[offset+mapped-1, j] += Y[k] * dq)
         end
     end
     return nothing
