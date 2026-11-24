@@ -17,11 +17,20 @@ gate tests use only the Python standard library and can run without NumPy,
 Cantera, or Julia:
 
 ```sh
-python -m unittest discover -s test/cantera_parity -p 'test_xresid_gates.py' -v
+python -m unittest discover -s test/cantera_parity -p 'test_*_gates.py' -v
 ```
 
 These Python checks are separate from the Julia `Pkg.test()` entry point and
 run in their own Linux CI job.
+
+`test_extinction_gates.py` covers diffusion and stagnation controls. Before
+grading accuracy, both counterflow profile comparators require every temperature
+to be finite and each profile's peak to exceed the hotter endpoint by at least
+500 K, including the independent adaptive reference in `counterflow_compare.py`.
+A refusal report records `physical_validity: false` and the measured rises in
+kelvin (`null` for invalid temperature data). The held-out subset requires an
+explicit `gates.physical_validity` verdict from the harness. When NumPy is
+available the suite also exercises the NPZ command-line comparisons.
 
 Before reporting aggregates, `xresid.py` checks every non-absent physical
 residual maximum, relative residual, and shared-row agreement value for finite,
