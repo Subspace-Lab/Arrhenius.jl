@@ -70,10 +70,16 @@ Layout negative checks: `julia --project=example/reactors test/cantera_parity/co
 
 ### Latest complete regression
 
-Latest accepted run: **35 integration + 4 static Jacobian scenarios, 8781/8781 assertions** including
-five comparator selfchecks, plus the separate lightweight guard **1/1**.
-Coverage is **46 covered / 273 missing / 104 not_applicable**; see the
-[constant-flow MFC acceptance record](verification/connector_mfc_constant_2026-11-02.md).
+Latest accepted run (2026-11-10): **45 scenarios, 5971/5971 assertions in 46 testsets**
+including five comparator self-checks. Core **1/1**, layout **8/8** and runner
+controls **11/11** passed separately. The existing repaired HO2 pulse is now
+included in `all` and no-argument mode; its test body and numerical gates are unchanged.
+Coverage is **54 covered / 265 missing / 104 not_applicable**; see the
+[HO2 registration and full-regression record](verification/ho2_registration_2026-11-10.md).
+All 44 preceding scenario names/order/assertion counts, 21 numeric artifacts and
+192 reported solver counters match the accepted #90 maintenance run.
+Dated sections below retain their historical counts and failure status; this
+current acceptance supersedes them without deleting the original evidence.
 
 | Case | Upstream behavior |
 |---|---|
@@ -81,6 +87,7 @@ Coverage is **46 covered / 273 missing / 104 not_applicable**; see the
 | `connector_species_subset` | Three-species upstream MFC into ten species: full T/V/species cross rows, including actual volume perturbations, preserving all13 original assertions. |
 | `connector_mfc_energy` | Static energy-enabled MFC temperature and mole-coordinate species cross derivatives versus independent source-scaled finite differences, preserving all three original assertions. |
 | `connector_heat_jacobian` | Static heat-wall cross-temperature derivatives versus independent finite differences and UA/(m cv), preserving all four original assertions. |
+| `mass_flow_controller` | Original triangular H2 pulse: sampled flows, endpoint total mass and all ten species masses; retained HO2 failure now repaired by accepted #83. |
 | `disable_chemistry` | Disabled chemistry preserves temperature and composition through 11 s. |
 | `combustor_step` | Hydrogen combustor with a Gaussian radical pulse: accepted steps through 0.25 s, compared to the pinned full temperature/mole-fraction profile. |
 | `combustor_advance` | The same combustor at the original100 output times through0.25 s, using Advance's stricter profile limits. |
@@ -124,15 +131,16 @@ guard. The HP source body likewise explicitly constructs a constant-pressure
 reactor without accessing `self`, so its four inherited rows share one scenario.
 Other physics variants are not inferred from a different reactor class's run.
 
-The `mass_flow_controller` pulse candidate has a passing Cantera reference and
-a reproducible native species-mass assertion failure. It remains `missing` in
-the coverage table and runs **only when explicitly named**, outside `all`:
+The existing `mass_flow_controller` pulse now passes the original Cantera and
+native assertions and runs in `all`. It can still be selected individually:
 
 ```powershell
 julia --project=example/reactors test/cantera_parity/run_solver_regressions.jl mass_flow_controller
 ```
 
-Do not weaken the upstream comparison tolerances to accept this candidate.
+The [original failure](verification/pulse_failure_2026-10-29.md) remains unchanged
+as historical evidence. The [new acceptance](verification/ho2_registration_2026-11-10.md)
+links the accepted #83 fix and fresh verification; no comparison tolerance was relaxed.
 
 For example, run a selected group with:
 
@@ -403,7 +411,7 @@ normally. Step counts and crossing times differ across solvers and are not
 asserted equal. `valve3` retains rtol=1e-12 / atol=1e-20; the pressure
 controller retains the default rtol=1e-9 / atol=1e-15.
 
-The [retained pulse failure](verification/pulse_failure_2026-10-29.md)
+The historical [retained pulse failure](verification/pulse_failure_2026-10-29.md)
 documents `mass_flow_controller`: Cantera passes, and two native runs reach
 2.5 s with the correct injected mass, but HO2 mass is 4.5831e-12 kg against
 the original 1e-12 kg absolute threshold. The final assertion remains strict.
@@ -746,7 +754,7 @@ are separate. Coverage **50/269/104**; all previously suspended cases stay open.
 
 ## Nonideal constant-volume ignition
 
-Run `rk_cv_ignition` for the Redlich–Kwong hydrogen-air energy check. The case compares total internal energy at every accepted step and requires a final temperature rise above 500 K. See the [reproduction commands, limits and results](verification/rk_cv_ignition_2026-11-02.md). The local optional suite now has 44 scenarios.
+Run `rk_cv_ignition` for the Redlich–Kwong hydrogen-air energy check. The case compares total internal energy at every accepted step and requires a final temperature rise above 500 K. See the [reproduction commands, limits and results](verification/rk_cv_ignition_2026-11-02.md). That historical checkpoint had 44 scenarios; the latest complete regression above includes the repaired pulse.
 
 The Julia selector `heat_flux_func` also covers the prescribed-heat-flux case for the generic Cantera Reactor on the ideal-gas phase. Select `--case reactor_heat_flux_func` in the Python reference runner for that class. [Commands, measured balances and coverage scope](verification/reactor_heat_flux_2026-11-02.md).
 

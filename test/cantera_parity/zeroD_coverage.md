@@ -34,10 +34,18 @@ executed, or passing test counts. Helper/fixture methods are not test rows.
 
 ## Status, layer, and evidence
 
+Current acceptance (2026-11-10): [HO2 registration](verification/ho2_registration_2026-11-10.md).
+Only `TestIdealGasReactor.test_mass_flow_controller` changes from missing to covered.
+The repaired existing case is included in the optional `all` suite: 45 scenarios,
+5971 assertions including five comparator checks. Historical sections below keep
+their stage-specific counts; the original 2026-10-29 failure is preserved unchanged.
+Behavior coverage, trajectory accuracy and regression status are distinct; this
+promotion establishes the original pulse behavior, not universal trajectory precision.
+
 | Status | Rows | Meaning |
 |---|---:|---|
-| `covered` | 53 | Full upstream behavior with linked user-run or authorized agent-run evidence. |
-| `missing` | 266 | Complete parity coverage is not established; may have related native functionality or a written but unrun port. |
+| `covered` | 54 | Full upstream behavior with linked user-run or authorized agent-run evidence. |
+| `missing` | 265 | Complete parity coverage is not established; may have related native functionality or a written but unrun port. |
 | `not_applicable` | 104 | Specific binding/factory/internal or Graphviz contract, or an explicitly disabled upstream row; each has a reason. |
 
 `missing` does **not** mean the native feature is absent or that a test has
