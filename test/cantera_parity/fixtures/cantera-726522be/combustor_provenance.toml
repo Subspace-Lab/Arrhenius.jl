@@ -1,0 +1,24 @@
+cantera_commit = "726522be4e2a13454d8415b7ef799d621f665cf3"
+upstream_test = "test/python/test_reactor.py::TestCombustor::test_integrateWithStep"
+profile_source = "test/data/CombustorTest-integrateWithAdvance.csv"
+profile_file = "CombustorTest-integrateWithAdvance.csv"
+profile_sha256_lf = "7e21a86c82ae905150edab14d7f7f88c046fd1d6c4dec4d4dfb10440f73cd7b6"
+mechanism_file = "h2o2.yaml"
+mechanism_sha256_lf = "0efc6c52862741a29e0c29b65d979c7d8cb409db5282bca83b9c5437b3d8c8d4"
+phase = "ohmech"
+species_count = 10
+reaction_count = 29
+species_names = ["H2", "H", "O", "O2", "OH", "H2O", "HO2", "H2O2", "AR", "N2"]
+transport_model_reference = "none"
+integration_rtol = 1e-9
+integration_atol = 1e-15
+# test_reactor.py:3362-3363; xtol is utilities.compareProfiles default.
+profile_rtol = 1e-3
+profile_atol = 1e-9
+profile_xtol = 1e-5
+# test_reactor.py:3379-3381; same compareProfiles default xtol.
+advance_upstream_test = "test/python/test_reactor.py::TestCombustor::test_integrateWithAdvance"
+advance_profile_rtol = 1e-6
+advance_profile_atol = 1e-12
+# test_reactor.py:3405-3407 uses the same limits as Advance.
+invasive_upstream_test = "test/python/test_reactor.py::TestCombustor::test_invasive_mdot_function"

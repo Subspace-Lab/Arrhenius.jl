@@ -1,0 +1,222 @@
+description: |
+  Trough mechanism from 'S. J. Harris and D. G. Goodwin, 'Growth on
+  the reconstructed diamond (100) surface, 'J. Phys. Chem. vol. 97,
+  23-28 (1993). reactions a - t are taken directly from Table II,
+  with thermochemistry from Table IV. Reaction u is added here.
+generator: YamlWriter
+cantera-version: 4.0.0a2
+git-commit: 726522be4
+date: Mon Nov  2 18:41:29 2026
+phases:
+  - name: diamond_100
+    thermo: ideal-surface
+    elements: [H, C]
+    species: [c6HH, c6H*, c6*H, c6**, c6HM, c6HM*, c6*M, c6B]
+    site-density: 3.0e-08
+    kinetics: surface
+    state:
+      T: 1200.0
+      P: 1.01325e+05
+      Y: {c6H*: 0.05263157894736843, c6HH: 0.9473684210526317}
+    adjacent-phases: [gas, diamond]
+  - name: gas
+    thermo: ideal-gas
+    elements: [H, C]
+    species: [H, H2, CH3, CH4]
+    state:
+      T: 1200.0
+      density: 5.764125482335725e-04
+      Y: {CH3: 1.393897168678245e-03, CH4: 0.07436745020653504,
+      H: 9.345183545245569e-04, H2: 0.9233041342702621}
+  - name: diamond
+    thermo: fixed-stoichiometry
+    elements: [C]
+    species: [C(d)]
+    state:
+      T: 298.15
+      P: 1.01325e+05
+species:
+  - name: c6HH
+    composition: {H: 2.0}
+    thermo:
+      model: constant-cp
+      T0: 298.15
+      h0: 4.76976e+07
+      s0: 8.7864e+04
+      cp0: 0.0
+  - name: c6H*
+    composition: {H: 1.0}
+    thermo:
+      model: constant-cp
+      T0: 298.15
+      h0: 2.163128e+08
+      s0: 8.1588e+04
+      cp0: 0.0
+  - name: c6*H
+    composition: {H: 1.0}
+    thermo:
+      model: constant-cp
+      T0: 298.15
+      h0: 1.928824e+08
+      s0: 8.32616e+04
+      cp0: 0.0
+  - name: c6**
+    composition: {C: 0.0}
+    thermo:
+      model: constant-cp
+      T0: 298.15
+      h0: 3.7656e+08
+      s0: 7.69856e+04
+      cp0: 0.0
+  - name: c6HM
+    composition: {C: 1.0, H: 4.0}
+    thermo:
+      model: constant-cp
+      T0: 298.15
+      h0: 1.125496e+08
+      s0: 1.686152e+05
+      cp0: 0.0
+  - name: c6HM*
+    composition: {C: 1.0, H: 3.0}
+    thermo:
+      model: constant-cp
+      T0: 298.15
+      h0: 2.753072e+08
+      s0: 1.677784e+05
+      cp0: 0.0
+  - name: c6*M
+    composition: {C: 1.0, H: 3.0}
+    thermo:
+      model: constant-cp
+      T0: 298.15
+      h0: 2.230072e+08
+      s0: 1.627576e+05
+      cp0: 0.0
+  - name: c6B
+    composition: {C: 1.0, H: 2.0}
+    thermo:
+      model: constant-cp
+      T0: 298.15
+      h0: 1.711256e+08
+      s0: 1.125496e+05
+      cp0: 0.0
+  - name: H
+    composition: {H: 1.0}
+    thermo:
+      model: NASA7
+      temperature-ranges: [200.0, 1000.0, 3500.0]
+      data:
+        - [2.5, 7.05332819e-13, -1.99591964e-15, 2.30081632e-18, -9.27732332e-22,
+        2.54736599e+04, -0.446682853]
+        - [2.50000001, -2.30842973e-11, 1.61561948e-14, -4.73515235e-18,
+        4.98197357e-22, 2.54736599e+04, -0.446682914]
+      note: L7/88
+    transport:
+      model: gas
+      geometry: atom
+      diameter: 2.05
+      well-depth: 145.0
+  - name: H2
+    composition: {H: 2.0}
+    thermo:
+      model: NASA7
+      temperature-ranges: [200.0, 1000.0, 3500.0]
+      data:
+        - [2.34433112, 7.98052075e-03, -1.9478151e-05, 2.01572094e-08,
+        -7.37611761e-12, -917.935173, 0.683010238]
+        - [3.3372792, -4.94024731e-05, 4.99456778e-07, -1.79566394e-10,
+        2.00255376e-14, -950.158922, -3.20502331]
+      note: TPIS78
+    transport:
+      model: gas
+      geometry: linear
+      diameter: 2.92
+      well-depth: 38.0
+      polarizability: 0.79
+      rotational-relaxation: 280.0
+  - name: CH3
+    composition: {C: 1.0, H: 3.0}
+    thermo:
+      model: NASA7
+      temperature-ranges: [200.0, 1000.0, 3500.0]
+      data:
+        - [3.6735904, 2.01095175e-03, 5.73021856e-06, -6.87117425e-09,
+        2.54385734e-12, 1.64449988e+04, 1.60456433]
+        - [2.28571772, 7.23990037e-03, -2.98714348e-06, 5.95684644e-10,
+        -4.67154394e-14, 1.67755843e+04, 8.48007179]
+      note: L11/89
+    transport:
+      model: gas
+      geometry: linear
+      diameter: 3.8
+      well-depth: 144.0
+  - name: CH4
+    composition: {C: 1.0, H: 4.0}
+    thermo:
+      model: NASA7
+      temperature-ranges: [200.0, 1000.0, 3500.0]
+      data:
+        - [5.14987613, -0.0136709788, 4.91800599e-05, -4.84743026e-08,
+        1.66693956e-11, -1.02466476e+04, -4.64130376]
+        - [0.074851495, 0.0133909467, -5.73285809e-06, 1.22292535e-09,
+        -1.0181523e-13, -9468.34459, 18.437318]
+      note: L8/88
+    transport:
+      model: gas
+      geometry: nonlinear
+      diameter: 3.746
+      well-depth: 141.4
+      polarizability: 2.6
+      rotational-relaxation: 13.0
+  - name: C(d)
+    composition: {C: 1.0}
+    thermo:
+      model: constant-cp
+      T0: 298.15
+      h0: 0.0
+      s0: 0.0
+      cp0: 0.0
+    equation-of-state:
+      model: constant-volume
+      density: 3520.0
+reactions:
+  - equation: H + c6HH <=> H2 + c6H*
+    rate-constant: {A: 1.3e+11, b: 0.0, Ea: 3.05432e+07}
+  - equation: H + c6H* <=> c6HH
+    rate-constant: {A: 1.0e+10, b: 0.0, Ea: 0.0}
+  - equation: CH3 + c6H* <=> c6HM
+    rate-constant: {A: 5.0e+09, b: 0.0, Ea: 0.0}
+  - equation: H + c6HM <=> H2 + c6*M
+    rate-constant: {A: 1.3e+11, b: 0.0, Ea: 3.05432e+07}
+  - equation: H + c6*M <=> c6HM
+    rate-constant: {A: 1.0e+10, b: 0.0, Ea: 0.0}
+  - equation: H + c6HM <=> H2 + c6HM*
+    rate-constant: {A: 2.8e+04, b: 2.0, Ea: 3.22168e+07}
+  - equation: H + c6HM* <=> c6HM
+    rate-constant: {A: 1.0e+10, b: 0.0, Ea: 0.0}
+  - equation: c6HM* <=> c6*M
+    rate-constant: {A: 1.0e+08, b: 0.0, Ea: 0.0}
+  - equation: H + c6HM* <=> CH3 + c6H*
+    rate-constant: {A: 3.0e+10, b: 0.0, Ea: 0.0}
+  - equation: H + c6HM* <=> H2 + c6B
+    rate-constant: {A: 1.3e+11, b: 0.0, Ea: 3.05432e+07}
+  - equation: H + c6*M <=> H2 + c6B
+    rate-constant: {A: 2.8e+04, b: 2.0, Ea: 3.22168e+07}
+  - equation: H + c6HH <=> H2 + c6*H
+    rate-constant: {A: 1.3e+11, b: 0.0, Ea: 3.05432e+07}
+  - equation: H + c6*H <=> c6HH
+    rate-constant: {A: 1.0e+10, b: 0.0, Ea: 0.0}
+  - equation: H + c6H* <=> H2 + c6**
+    rate-constant: {A: 1.3e+11, b: 0.0, Ea: 3.05432e+07}
+  - equation: H + c6** <=> c6H*
+    rate-constant: {A: 1.0e+10, b: 0.0, Ea: 0.0}
+  - equation: H + c6*H <=> H2 + c6**
+    rate-constant: {A: 4500.0, b: 2.0, Ea: 2.092e+07}
+  - equation: H + c6** <=> c6*H
+    rate-constant: {A: 1.0e+10, b: 0.0, Ea: 0.0}
+  - equation: CH3 + c6** <=> c6*M
+    rate-constant: {A: 5.0e+09, b: 0.0, Ea: 0.0}
+  - equation: c6H* <=> c6*H
+    rate-constant: {A: 1.0e+08, b: 0.0, Ea: 0.0}
+  - equation: c6B => C(d) + c6HH
+    rate-constant: {A: 1.0e+09, b: 0.0, Ea: 0.0}

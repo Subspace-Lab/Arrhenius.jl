@@ -1,0 +1,90 @@
+description: |
+  Trough mechanism from 'S. J. Harris and D. G. Goodwin, 'Growth on
+  the reconstructed diamond (100) surface, 'J. Phys. Chem. vol. 97,
+  23-28 (1993). reactions a - t are taken directly from Table II,
+  with thermochemistry from Table IV. Reaction u is added here.
+generator: YamlWriter
+cantera-version: 4.0.0a2
+git-commit: 726522be4
+date: Mon Nov  2 18:41:29 2026
+phases:
+  - name: gas
+    thermo: ideal-gas
+    elements: [H, C]
+    species: [H, H2, CH3, CH4]
+    state:
+      T: 1200.0
+      density: 5.764125482335725e-04
+      Y: {CH3: 1.393897168678245e-03, CH4: 0.07436745020653504,
+      H: 9.345183545245569e-04, H2: 0.9233041342702621}
+species:
+  - name: H
+    composition: {H: 1.0}
+    thermo:
+      model: NASA7
+      temperature-ranges: [200.0, 1000.0, 3500.0]
+      data:
+        - [2.5, 7.05332819e-13, -1.99591964e-15, 2.30081632e-18, -9.27732332e-22,
+        2.54736599e+04, -0.446682853]
+        - [2.50000001, -2.30842973e-11, 1.61561948e-14, -4.73515235e-18,
+        4.98197357e-22, 2.54736599e+04, -0.446682914]
+      note: L7/88
+    transport:
+      model: gas
+      geometry: atom
+      diameter: 2.05
+      well-depth: 145.0
+  - name: H2
+    composition: {H: 2.0}
+    thermo:
+      model: NASA7
+      temperature-ranges: [200.0, 1000.0, 3500.0]
+      data:
+        - [2.34433112, 7.98052075e-03, -1.9478151e-05, 2.01572094e-08,
+        -7.37611761e-12, -917.935173, 0.683010238]
+        - [3.3372792, -4.94024731e-05, 4.99456778e-07, -1.79566394e-10,
+        2.00255376e-14, -950.158922, -3.20502331]
+      note: TPIS78
+    transport:
+      model: gas
+      geometry: linear
+      diameter: 2.92
+      well-depth: 38.0
+      polarizability: 0.79
+      rotational-relaxation: 280.0
+  - name: CH3
+    composition: {C: 1.0, H: 3.0}
+    thermo:
+      model: NASA7
+      temperature-ranges: [200.0, 1000.0, 3500.0]
+      data:
+        - [3.6735904, 2.01095175e-03, 5.73021856e-06, -6.87117425e-09,
+        2.54385734e-12, 1.64449988e+04, 1.60456433]
+        - [2.28571772, 7.23990037e-03, -2.98714348e-06, 5.95684644e-10,
+        -4.67154394e-14, 1.67755843e+04, 8.48007179]
+      note: L11/89
+    transport:
+      model: gas
+      geometry: linear
+      diameter: 3.8
+      well-depth: 144.0
+  - name: CH4
+    composition: {C: 1.0, H: 4.0}
+    thermo:
+      model: NASA7
+      temperature-ranges: [200.0, 1000.0, 3500.0]
+      data:
+        - [5.14987613, -0.0136709788, 4.91800599e-05, -4.84743026e-08,
+        1.66693956e-11, -1.02466476e+04, -4.64130376]
+        - [0.074851495, 0.0133909467, -5.73285809e-06, 1.22292535e-09,
+        -1.0181523e-13, -9468.34459, 18.437318]
+      note: L8/88
+    transport:
+      model: gas
+      geometry: nonlinear
+      diameter: 3.746
+      well-depth: 141.4
+      polarizability: 2.6
+      rotational-relaxation: 13.0
+
+reactions: []
