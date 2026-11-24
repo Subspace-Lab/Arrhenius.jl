@@ -17,6 +17,19 @@ if !isdefined(@__MODULE__, :StructuredReactorSolver) &&
     end
 end
 
+# Only known physical/inversion failures are domain rejections. Programming
+# exceptions retain their original type and message instead of being retried.
+function _internal_energy_outside_domain(rhs::Arrhenius.InternalEnergyRHS, u)
+    (!all(isfinite,u) || minimum(view(u,1:length(u)-1)) < -1e-13) && return true
+    try
+        props = Arrhenius.reactor_properties(rhs,u)
+        return !(isfinite(props.temperature) && props.temperature > 0)
+    catch error
+        (error isa DomainError || error isa Arrhenius._InternalEnergyInversionError) || rethrow()
+        return true
+    end
+end
+
 """
 Integrate an Arrhenius reactor problem with Julia's adaptive QNDF solver.
 
@@ -26,11 +39,21 @@ Other reactors use the dense Jacobian supplied by `reactor_problem`.
 
 Set `linear_solver=:dense` to use the guarded analytic Jacobian and signed RHS
 with QNDF's ordinary dense linear solver for supported reactors. The default
-`linear_solver=:auto` retains automatic structured selection.
+`linear_solver=:auto` retains automatic structured selection. For
+`InternalEnergyReactor`, both `:auto` and `:dense` use the same supplied dense
+Jacobian and ordinary QNDF solver; no structured adapter is available.
 """
 function native_bdf(problem; linear_solver=:auto, kwargs...)
     linear_solver in (:auto, :dense) ||
         throw(ArgumentError("linear_solver must be :auto or :dense"))
+    if problem.f isa Arrhenius.InternalEnergyRHS
+        f = SciMLBase.ODEFunction(problem.f; jac=problem.jac, tgrad=problem.tgrad)
+        ode = SciMLBase.ODEProblem(f, problem.u0, problem.tspan, problem.p)
+        outside_domain = (u,p,t) -> _internal_energy_outside_domain(problem.f,u)
+        solution = SciMLBase.solve(ode, OrdinaryDiffEqBDF.QNDF(); isoutofdomain=outside_domain, kwargs...)
+        SciMLBase.successful_retcode(solution) || error("internal-energy integration failed: $(solution.retcode)")
+        return solution
+    end
     if problem.f isa Arrhenius.PlasmaEnergyRHS
         f = SciMLBase.ODEFunction(problem.f; jac=problem.jac, tgrad=problem.tgrad,
             jac_prototype=zeros(length(problem.u0), length(problem.u0)))
