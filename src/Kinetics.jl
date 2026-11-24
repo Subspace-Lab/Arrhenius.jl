@@ -369,14 +369,14 @@ function _mass_action_product_gradient!(gradient, C, species, orders, stoich,
     nterms = 0
     if standard
         @inbounds for j in entries
-            nterms += Int(stoich[species[j], column])
+            nterms += Int(orders[j])
         end
     end
     standard &= 1 <= nterms <= 3
     if standard && !cantera_compatible
         negative_factors = 0
         @inbounds for j in entries
-            negative_factors += Int(C[species[j]] < 0) * Int(stoich[species[j], column])
+            negative_factors += Int(C[species[j]] < 0) * Int(orders[j])
         end
         negative_factors >= 2 && return gradient
     elseif !standard
@@ -388,14 +388,14 @@ function _mass_action_product_gradient!(gradient, C, species, orders, stoich,
 
     @inbounds for j in entries
         k = species[j]
-        order = standard ? Int(stoich[k, column]) : orders[j]
+        order = standard ? Int(orders[j]) : orders[j]
         order == 0 && continue
         if standard && cantera_compatible
             # Cantera's C1/C2/C3 derivative requires every remaining reactant
             # factor to be positive, including repeated occurrences of k.
             active=true
             for other in entries
-                count = Int(stoich[species[other], column]) - Int(other == j)
+                count = Int(orders[other]) - Int(other == j)
                 if count > 0 && C[species[other]] <= 0
                     active=false
                     break
@@ -411,7 +411,7 @@ function _mass_action_product_gradient!(gradient, C, species, orders, stoich,
                 term = C[k]^(order - 1)
                 for other in entries
                     other == j && continue
-                    term *= C[species[other]]^Int(stoich[species[other], column])
+                    term *= C[species[other]]^Int(orders[other])
                 end
                 derivative += term
             end

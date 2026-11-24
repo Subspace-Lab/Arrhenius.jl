@@ -100,13 +100,12 @@ function _flame_concentration_jacobian!(d,reaction,T,P,C,h,s,cache;cantera_compa
     plog=reaction.plog
     issorted(plog.reaction_indices) || return false
     logT=log(T);plog_cursor=1
-    wdot!(d.source_direction,reaction,T,C,s,h,d.kinetics;
-        temperature_cache=cache,pressure=P,get_rate_constants=true)
+    _rate_factors!(reaction,T,C,s,h,d.kinetics;temperature_cache=cache,pressure=P)
     J=d.concentration_jacobian;fill!(J,0)
     kf,kr=d.kinetics.kf,d.kinetics.kr
     vr,vv=rowvals(reaction.vk),nonzeros(reaction.vk)
     er,ev=rowvals(reaction.efficiencies_coeffs),nonzeros(reaction.efficiencies_coeffs)
-    # Temperature-only factors cached by the wdot! call above at this T and P.
+    # Temperature-only factors cached above at this T and P.
     cached=cache!==nothing && cache.temperature==T
     cached_plog=cached && cache.pressure==P
     @inbounds for i in 1:reaction.n_reactions
@@ -118,14 +117,19 @@ function _flame_concentration_jacobian!(d,reaction,T,P,C,h,s,cache;cantera_compa
                 nonzeros(reaction.product_stoich_coeffs),reaction.product_stoich_coeffs,i,
                 nzrange(reaction.product_stoich_coeffs,i),-kr[i];cantera_compatible)
         end
-        pf=_mass_action_product(C,rowvals(reaction.reactant_orders),nonzeros(reaction.reactant_orders),
-            reaction.reactant_stoich_coeffs,i,nzrange(reaction.reactant_orders,i))
-        pr=reaction.is_reversible[i] ? _mass_action_product(C,rowvals(reaction.product_stoich_coeffs),
-            nonzeros(reaction.product_stoich_coeffs),reaction.product_stoich_coeffs,i,
-            nzrange(reaction.product_stoich_coeffs,i)) : 0.0
-        multiplier=pf-(reaction.is_reversible[i] ? pr/d.kinetics.equilibrium_constants[i] : 0.0)
+        is_plog=plog_cursor<=length(plog.reaction_indices) && plog.reaction_indices[plog_cursor]==i
+        multiplier=0.0
+        if d.reaction_kind[i]!=0 || (is_plog && (plog.collider_indices[plog_cursor]>0 ||
+                _plog_linear_burke(plog,plog_cursor)))
+            pf=_mass_action_product(C,rowvals(reaction.reactant_orders),nonzeros(reaction.reactant_orders),
+                reaction.reactant_stoich_coeffs,i,nzrange(reaction.reactant_orders,i))
+            pr=reaction.is_reversible[i] ? _mass_action_product(C,rowvals(reaction.product_stoich_coeffs),
+                nonzeros(reaction.product_stoich_coeffs),reaction.product_stoich_coeffs,i,
+                nzrange(reaction.product_stoich_coeffs,i)) : 0.0
+            multiplier=pf-(reaction.is_reversible[i] ? pr/d.kinetics.equilibrium_constants[i] : 0.0)
+        end
         collider_derivative=0.0
-        if plog_cursor<=length(plog.reaction_indices) && plog.reaction_indices[plog_cursor]==i
+        if is_plog
             # A named PLOG collider multiplies the interpolated rate by its concentration.
             collider=plog.collider_indices[plog_cursor]
             if collider>0
@@ -220,6 +224,16 @@ function _flame_source_jacobian!(G,d,gas,P,T,y,X,h,cache;cantera_compatible=fals
 end
 
 
+# The hybrid Jacobian needs a local chemistry block and two face derivatives.
+# Its chemistry scratch never uses the conservative per-grid derivative arrays.
+struct _AutoSpeciesWorkspace
+    chemistry::_ConservativeFlameDerivatives
+    source::Matrix{Float64}
+    cp::Vector{Float64}
+end
+_AutoSpeciesWorkspace(gas,N) = _AutoSpeciesWorkspace(_ConservativeFlameDerivatives(gas,0),
+    zeros(gas.n_species,gas.n_species+1),zeros(N))
+
 """Fill Cantera-auto interior species columns for the native finite-difference residual.
 
 The mixture-averaged transport coefficients are frozen. This helper fills only
@@ -231,15 +245,25 @@ function _flame_auto_species_jacobian!(band,f,u,w,r;previous=nothing,dt=Inf)
     (f.transport_model == :mixture_averaged && !f.soret_enabled &&
         f.flux_gradient_basis == :mole) || return false
     n,N=f.gas.n_species,length(f.grid);B=n+2;MW=f.gas.MW
-    d=_ConservativeFlameDerivatives(f.gas,N)
-    G=zeros(n,n+1)
-    fluxleft=zeros(n,n);fluxright=zeros(n,n);rawderivs=zeros(n)
-    for j in 2:N-1
-        invmw=sum(@view(u[2:n+1,j])./MW)
+    scratch=w.auto_species[]
+    if scratch===nothing
+        scratch=_AutoSpeciesWorkspace(f.gas,N)
+        w.auto_species[]=scratch
+    end
+    d=scratch.chemistry
+    G=scratch.source
+    fluxleft,fluxright,rawderivs=d.flux_left,d.flux_right,d.uncorrected_flux
+    ratios,steady=d.projected_left,d.projected_right
+    @inbounds for j in 2:N-1
+        scratch.cp[j]=sum(u[k+1,j]*w.cp[k,j]/MW[k] for k in 1:n)
+    end
+    @inbounds for j in 2:N-1
+        # Preserve the array reduction used for these mole fractions.
+        ratios .= @view(u[2:n+1,j]) ./ MW
+        invmw=sum(ratios)
         _flame_source_jacobian!(G,d,f.gas,f.pressure,1000u[1,j],
             @view(u[2:n+1,j]),@view(w.X[:,j]),@view(w.h[:,j]),w.rate_caches[j];
             cantera_compatible=(f.discretization==:finite_difference)) || return false
-        fill!(fluxleft,0); fill!(fluxright,0)
         for face in (j-1,j)
             dz=f.grid[face+1]-f.grid[face]
             raw_sum=0.0
@@ -265,12 +289,18 @@ function _flame_auto_species_jacobian!(band,f,u,w,r;previous=nothing,dt=Inf)
                 end
             end
         end
-        drho_ratio=-1.0./(MW.*invmw)
+        ratios .= -1.0 ./ (MW .* invmw)
+        left=f.grid[j]-f.grid[j-1]
+        cell=.5*(f.grid[j+1]-f.grid[j-1])
+        for k in 1:n
+            steady[k]=MW[k]*w.source[k,j]-(w.flux[k,j]-w.flux[k,j-1])/cell-
+                u[end,j]*(u[k+1,j]-u[k+1,j-1])/left
+        end
         for m in 1:n, jj in max(2,j-1):min(N-1,j+1)
             left=f.grid[jj]-f.grid[jj-1]
             cell=.5*(f.grid[min(jj+1,N)]-f.grid[jj-1])
             row_is_node=jj==j
-            cp=sum(u[k+1,jj]*w.cp[k,jj]/MW[k] for k in 1:n)
+            cp=scratch.cp[jj]
             factor=_flame_timescale/w.rho[jj]
             transient_energy=previous===nothing ? 0.0 :
                 _flame_timescale/dt*(u[1,jj]-previous[1,jj])
@@ -289,7 +319,7 @@ function _flame_auto_species_jacobian!(band,f,u,w,r;previous=nothing,dt=Inf)
                 dAenergy-=u[end,j]*dcp*dTdz
             end
             value=row_is_node ? factor/(1000cp)*dAenergy-
-                energy_steady*(drho_ratio[m]+dcp/cp) : factor/(1000cp)*dAenergy
+                energy_steady*(ratios[m]+dcp/cp) : factor/(1000cp)*dAenergy
             if f isa BurnerFlame && !isempty(f.imposed_temperature)
                 value=0.0
             end
@@ -304,10 +334,7 @@ function _flame_auto_species_jacobian!(band,f,u,w,r;previous=nothing,dt=Inf)
                 dA=-ddiv+conv
                 row_is_node && (dA+=MW[k]*G[k,m+1])
                 if row_is_node
-                    asteady=MW[k]*w.source[k,jj]-
-                        (w.flux[k,jj]-w.flux[k,jj-1])/cell-
-                        u[end,jj]*(u[k+1,jj]-u[k+1,jj-1])/left
-                    value=factor*dA-factor*asteady*drho_ratio[m]-
+                    value=factor*dA-factor*steady[k]*ratios[m]-
                         (k==m && previous!==nothing ? _flame_timescale/dt : 0.0)
                 else
                     value=factor*dA
@@ -321,7 +348,8 @@ function _flame_auto_species_jacobian!(band,f,u,w,r;previous=nothing,dt=Inf)
         # (Y,u) coordinates. In native (Y,m) coordinates those rows retain
         # the velocity-column chain-rule term du/dY at fixed mass flux.
         for (j,boundary) in ((2,1),(N-1,N))
-            invmw=sum(@view(u[2:n+1,j])./MW)
+            ratios .= @view(u[2:n+1,j]) ./ MW
+            invmw=sum(ratios)
             scale_base=u[end,j]/invmw
             for m in 1:n
                 col_y=(j-1)*B+(m+1)

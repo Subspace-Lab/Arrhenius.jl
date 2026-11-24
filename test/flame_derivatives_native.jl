@@ -260,6 +260,33 @@ end
 
 end
 
+@testset "colored stencil preserves the base state between probes" begin
+    mechanism=joinpath(@__DIR__,"..","mechanism","h2o2.yaml")
+    gas=CreateSolution(mechanism)
+    grid=collect(range(0.,.03;length=13)) # both endpoints have the same color
+    for kind in (:free,:burner,:fixed)
+        opts=(;X="H2:1.1,O2:1,AR:5",grid,discretization=:finite_difference)
+        f=kind==:free ? FreeFlame(gas;opts...) : BurnerFlame(gas;opts...,mdot=.08)
+        kind==:fixed && set_temperature_profile!(f,grid,temperature(f);relative=false)
+        w=Arrhenius.FlameWorkspace(f)
+        w.clip_species[]=true
+        f.state[3,4]=-1e-13
+        previous=.99 .* f.state
+        residual=flame_residual!(similar(f.state),f,f.state,w;previous,dt=.01)
+        base_flux=copy(w.flux)
+        B=size(f.state,1)
+        for analytic in (true,false)
+            kwargs=(;previous,dt=.01,analytic,cantera_omission=true)
+            expected=copy(Arrhenius._flame_jacobian(f,f.state,w,residual;kwargs...,local_property_updates=false))
+            # LU may leave arbitrary values above the physical band.
+            fill!(@view(w.band[1:2B-1,:]),NaN)
+            actual=Arrhenius._flame_jacobian(f,f.state,w,residual;kwargs...)
+            @test isequal(@view(actual[2B:end,:]),@view(expected[2B:end,:]))
+            @test isequal(w.flux,base_flux)
+        end
+    end
+end
+
 @testset "auto analytic burner interior species Jacobian" begin
     mechanism=joinpath(@__DIR__,"..","mechanism","h2o2.yaml")
     gas=CreateSolution(mechanism)

@@ -330,7 +330,7 @@ struct FlameWorkspace{K}
     conductivity::Vector{Float64}
     diffusion_prefactor::Matrix{Float64}
     C::Vector{Float64}
-    entropy::Vector{Float64}
+    entropy::Matrix{Float64}
     xmid::Vector{Float64}
     ymid::Vector{Float64}
     band::Matrix{Float64}
@@ -338,6 +338,10 @@ struct FlameWorkspace{K}
     residual_perturbed::Matrix{Float64}
     steps::Vector{Float64}
     property_nodes::_FlamePropertyNodes
+    probe_faces::_FlamePropertyNodes
+    probe_rows::_FlamePropertyNodes
+    base_flux::Matrix{Float64}
+    auto_species::Base.RefValue{Union{Nothing,_AutoSpeciesWorkspace}}
     correction::Vector{Float64}
     base_X::Matrix{Float64}
     base_rho::Vector{Float64}
@@ -370,8 +374,10 @@ function FlameWorkspace(f::AbstractPremixedFlame)
     n, N = f.gas.n_species, length(f.grid)
     return FlameWorkspace(KineticsWorkspace(f.gas.reaction),TransportWorkspace(f.gas),Ref(_premixed_stats(f)),
         zeros(n,N),zeros(N),zeros(n,N),zeros(n,N),zeros(n,N),zeros(n),zeros(n,N-1),zeros(N-1),
-        zeros(n,N-1),zeros(n),zeros(n),zeros(n),zeros(n),
-        zeros(6*(n+2)-2,(n+2)*N),zeros(n+2,N),zeros(n+2,N),zeros(N),_FlamePropertyNodes(Vector{Int}(undef,N),0),zeros((n+2)*N),
+        zeros(n,N-1),zeros(n),zeros(n,N+1),zeros(n),zeros(n),
+        zeros(6*(n+2)-2,(n+2)*N),zeros(n+2,N),zeros(n+2,N),zeros(N),_FlamePropertyNodes(Vector{Int}(undef,N),0),
+        _FlamePropertyNodes(Vector{Int}(undef,N-1),0),_FlamePropertyNodes(Vector{Int}(undef,N),0),
+        zeros(n,N-1),Ref{Union{Nothing,_AutoSpeciesWorkspace}}(nothing),zeros((n+2)*N),
         zeros(n,N),zeros(N),zeros(n,N),zeros(n,N),zeros(n,N),
         f.transport_model == :multicomponent ? MultiTransportWorkspace(f.multicomponent_data) : nothing,
         zeros(n,n,f.transport_model == :multicomponent ? N-1 : 0),zeros(n,N-1),
@@ -460,7 +466,7 @@ end
 @inline _flame_property_stats(w,f) = nothing
 
 function _flame_properties!(w,f,u; update_transport=true,nodes=eachindex(f.grid),freeze_source=false,
-        viscosity=nothing)
+        viscosity=nothing,faces=1:length(f.grid)-1,probe=false,reuse_thermo=false)
     gas, n, N = f.gas, f.gas.n_species, length(f.grid)
     conservative = _conservative_flame(f)
     stats = _flame_property_stats(w,f)
@@ -482,24 +488,31 @@ function _flame_properties!(w,f,u; update_transport=true,nodes=eachindex(f.grid)
             w.C[k] = pRT*w.X[k,j]
         end
         x = @view w.X[:,j]
-        cal_h_cp_s0!(@view(w.h[:,j]), @view(w.cp[:,j]), w.entropy, gas, T, f.pressure, x)
-        @view(w.h[:,j]) .*= R*T
-        @view(w.cp[:,j]) .*= R
-        w.entropy .*= R
+        # Perturbed temperatures use scratch entropy so the base node's
+        # entropy remains available for subsequent composition probes.
+        entropy = @view(w.entropy[:,probe && !reuse_thermo ? N+1 : j])
+        if !reuse_thermo
+            cal_h_cp_s0!(@view(w.h[:,j]), @view(w.cp[:,j]), entropy, gas, T, f.pressure, x)
+            @view(w.h[:,j]) .*= R*T
+            @view(w.cp[:,j]) .*= R
+            entropy .*= R
+        end
         # A frozen source keeps the base chemistry for hybrid Jacobian columns.
         if !freeze_source
-            wdot!(w.source_scratch,gas.reaction,T,w.C,w.entropy,@view(w.h[:,j]),w.kinetics;
+            wdot!(w.source_scratch,gas.reaction,T,w.C,entropy,@view(w.h[:,j]),w.kinetics;
                 temperature_cache=w.rate_caches[j],pressure=f.pressure)
             for k in 1:n
                 w.source[k,j] = w.source_scratch[k]
             end
         end
     end
-    @inbounds for j in 1:N-1
+    @inbounds for j in faces
         Tmid = 500*(u[1,j]+u[1,j+1])
-        meanMW = _flame_midpoint_composition!(w.ymid,w.xmid,
-            @view(u[2:n+1,j]),@view(u[2:n+1,j+1]),gas.MW,
-            conservative || f.transport_model == :multicomponent || f.soret_enabled)
+        if update_transport || conservative
+            meanMW = _flame_midpoint_composition!(w.ymid,w.xmid,
+                @view(u[2:n+1,j]),@view(u[2:n+1,j+1]),gas.MW,
+                conservative || f.transport_model == :multicomponent || f.soret_enabled)
+        end
         if update_transport
             if f.transport_model == :multicomponent
                 w.conductivity[j] = multicomponent_transport!(w.multi_transport,
@@ -530,7 +543,7 @@ function _flame_properties!(w,f,u; update_transport=true,nodes=eachindex(f.grid)
                 end
             else
                 mu, w.conductivity[j] = _mixture_transport!(w.transport,gas,f.pressure,Tmid,w.xmid,
-                    f.flux_gradient_basis)
+                    f.flux_gradient_basis,Val(viscosity !== nothing))
                 viscosity === nothing || (viscosity[j] = mu)
                 pRTm = f.pressure/(R*Tmid)
                 pmRTm = f.pressure*meanMW/(R*Tmid)
@@ -601,7 +614,7 @@ _flame_persistent_jacobian(f::Union{FreeFlame,BurnerFlame}) =
 _flame_recoverable_factorization_error(e) = e isa SingularException ||
     (e isa LinearAlgebra.LAPACKException && e.info > 0)
 
-function _flame_factorize!(f::Union{FreeFlame,BurnerFlame},w::FlameWorkspace,rdt)
+function _flame_factorize!(f::Union{FreeFlame,BurnerFlame},w::FlameWorkspace,rdt;steady_in_band=false)
     B,N = size(f.state)
     # A failed factorization overwrites the band before LAPACK reports its
     # singular pivot. Invalidate every cache field before touching that band;
@@ -610,7 +623,9 @@ function _flame_factorize!(f::Union{FreeFlame,BurnerFlame},w::FlameWorkspace,rdt
     empty!(w.jacobian_pivots[])
     w.jacobian_rdt[] = NaN
     band = w.band
-    copyto!(band,w.steady_jacobian)
+    # A newly assembled band already holds the steady matrix. Refactoring
+    # for a different time step needs the saved physical rows.
+    steady_in_band || copyto!(@view(band[2B:end,:]),@view(w.steady_jacobian[2B:end,:]))
     if rdt != 0
         diagonal = 4B-1
         # Both Cantera (EigenSparseJacobian::updateTransient) and the native
@@ -698,13 +713,13 @@ function _flame_previous_enthalpy!(c,f,previous)
 end
 
 function _conservative_flame_residual!(residual,f,u,w;previous=nothing,dt=Inf,
-        previous_enthalpy=nothing)
+        previous_enthalpy=nothing,rows=eachindex(f.grid))
     n,N = f.gas.n_species,length(f.grid)
     c = _conservative_flame_fluxes!(w.conservative,f,u,w)
     if previous !== nothing && previous_enthalpy === nothing
         previous_enthalpy = _flame_previous_enthalpy!(c,f,previous)
     end
-    @inbounds for j in 1:N
+    @inbounds for j in rows
         if f isa BurnerFlame
             residual[end,j] = j == 1 ? u[end,j]-f.mass_flux : u[end,j]-u[end,j-1]
         elseif j == f.anchor
@@ -758,17 +773,18 @@ end
 "Evaluate the discretized steady species, energy, and mass-flow residual."
 function flame_residual!(residual, f::AbstractPremixedFlame, u=f.state, w=FlameWorkspace(f);
         previous=nothing, dt=Inf, update_transport=true,nodes=eachindex(f.grid),
-        previous_enthalpy=nothing)
+        previous_enthalpy=nothing,faces=1:length(f.grid)-1,rows=eachindex(f.grid),
+        probe=false,reuse_thermo=false)
     # Counted at entry, before any work: every call to the public residual
     # evaluator increments residual_evals, mirroring counterflow_residual!.
     w.stats[].residual_evals+=1; PREMIXED_STATS.residual_evals+=1
     n,N = f.gas.n_species,length(f.grid)
-    _flame_properties!(w,f,u; update_transport,nodes)
+    _flame_properties!(w,f,u;update_transport,nodes,faces,probe,reuse_thermo)
     if _conservative_flame(f)
-        return _conservative_flame_residual!(residual,f,u,w;previous,dt,previous_enthalpy)
+        return _conservative_flame_residual!(residual,f,u,w;previous,dt,previous_enthalpy,rows)
     end
     z, MW = f.grid, f.gas.MW
-    @inbounds for j in 1:N
+    @inbounds for j in rows
         if f isa BurnerFlame
             residual[end,j] = j == 1 ? u[end,j]-f.mass_flux : u[end,j]-u[end,j-1]
         elseif j == f.anchor
@@ -892,12 +908,14 @@ function _flame_jacobian(f,u,w,r; previous=nothing,dt=Inf,previous_enthalpy=noth
     end
     B,N = size(u)
     band = w.band
-    fill!(band,0)
+    fill!(@view(band[2B:end,:]),0)
     kl = ku = 2*B-1
     perturbed = w.perturbed
     perturbed .= u
     rp = w.residual_perturbed
     steps = w.steps
+    local_stencil=local_property_updates && !update_transport && f isa Union{FreeFlame,BurnerFlame}
+    local_stencil && copyto!(w.base_flux,w.flux)
     copyto!(w.base_X,w.X)
     copyto!(w.base_rho,w.rho)
     copyto!(w.base_cp,w.cp)
@@ -913,6 +931,8 @@ function _flame_jacobian(f,u,w,r; previous=nothing,dt=Inf,previous_enthalpy=noth
     for k in 1:B, color in 1:3
         perturbed_any=false
         node_count=0
+        face_count=0
+        row_count=0
         for j in color:3:N
             auto_species_column = analytic && !update_transport && f isa Union{FreeFlame,BurnerFlame} &&
                 f.transport_model == :mixture_averaged && !f.soret_enabled &&
@@ -937,6 +957,20 @@ function _flame_jacobian(f,u,w,r; previous=nothing,dt=Inf,previous_enthalpy=noth
                 perturbed[B,j] = u[B,j]*u[1,j]/perturbed[1,j]
             end
             perturbed_any=true
+            if local_stencil
+                # Same-color nodes are three apart, so their row and face
+                # neighborhoods never overlap. Mass flux leaves diffusion fixed.
+                if k != B
+                    for face in max(1,j-1):min(N-1,j)
+                        face_count+=1
+                        w.probe_faces.indices[face_count]=face
+                    end
+                end
+                for row in max(1,j-1):min(N,j+1)
+                    row_count+=1
+                    w.probe_rows.indices[row_count]=row
+                end
+            end
             if local_property_updates && f isa Union{FreeFlame,BurnerFlame} &&
                     (update_transport || k != B) && perturbed[k,j] != u[k,j]
                 node_count += 1
@@ -945,15 +979,19 @@ function _flame_jacobian(f,u,w,r; previous=nothing,dt=Inf,previous_enthalpy=noth
         end
         perturbed_any || continue
         # Transport stays frozen for Newton; adjoint sensitivities update it.
-        nodes = if !local_property_updates || !(f isa Union{FreeFlame,BurnerFlame})
-            color:3:N
-        elseif !update_transport && k == B
-            ()
+        if local_stencil
+            w.property_nodes.count=node_count
+            w.probe_faces.count=face_count
+            w.probe_rows.count=row_count
+            flame_residual!(rp,f,perturbed,w;previous,dt,previous_enthalpy,update_transport,
+                nodes=w.property_nodes,faces=w.probe_faces,rows=w.probe_rows,probe=true,reuse_thermo=k!=1)
+        elseif f isa Union{FreeFlame,BurnerFlame}
+            w.property_nodes.count=node_count
+            nodes=local_property_updates ? w.property_nodes : (color:3:N)
+            flame_residual!(rp,f,perturbed,w;previous,dt,previous_enthalpy,update_transport,nodes,probe=true)
         else
-            w.property_nodes.count = node_count
-            w.property_nodes
+            flame_residual!(rp,f,perturbed,w;previous,dt,previous_enthalpy,update_transport,nodes=color:3:N)
         end
-        flame_residual!(rp,f,perturbed,w; previous,dt,previous_enthalpy,update_transport,nodes)
         for j in color:3:N
             auto_species_column = analytic && !update_transport && f isa Union{FreeFlame,BurnerFlame} &&
                 f.transport_model == :mixture_averaged && !f.soret_enabled &&
@@ -981,11 +1019,26 @@ function _flame_jacobian(f,u,w,r; previous=nothing,dt=Inf,previous_enthalpy=noth
                 f.flux_gradient_basis == :mole && (perturbed[B,j] = u[B,j])
             perturbed[k,j] = u[k,j]
         end
-        copyto!(w.X,w.base_X)
-        copyto!(w.rho,w.base_rho)
-        copyto!(w.cp,w.base_cp)
-        copyto!(w.h,w.base_h)
-        copyto!(w.source,w.base_source)
+        if local_stencil
+            @inbounds for j in w.property_nodes
+                w.rho[j]=w.base_rho[j]
+                copyto!(@view(w.X[:,j]),@view(w.base_X[:,j]))
+                copyto!(@view(w.source[:,j]),@view(w.base_source[:,j]))
+                if k==1
+                    copyto!(@view(w.cp[:,j]),@view(w.base_cp[:,j]))
+                    copyto!(@view(w.h[:,j]),@view(w.base_h[:,j]))
+                end
+            end
+            @inbounds for face in w.probe_faces
+                copyto!(@view(w.flux[:,face]),@view(w.base_flux[:,face]))
+            end
+        else
+            copyto!(w.X,w.base_X)
+            copyto!(w.rho,w.base_rho)
+            copyto!(w.cp,w.base_cp)
+            copyto!(w.h,w.base_h)
+            copyto!(w.source,w.base_source)
+        end
     end
     if analytic && !update_transport && f isa FreeFlame &&
             f.discretization == :finite_difference &&
@@ -994,7 +1047,9 @@ function _flame_jacobian(f,u,w,r; previous=nothing,dt=Inf,previous_enthalpy=noth
         for j in 1:N
             tcol=(j-1)*B+1; mcol=(j-1)*B+B
             slope=-u[B,j]/u[1,j]
-            for row in max(1,tcol-2B+1):min(B*N,tcol+2B-1)
+            # Both columns must contain this row. Outside the mass-flux
+            # band its derivative is zero; LAPACK can leave fill-in there.
+            for row in max(1,mcol-2B+1):min(B*N,tcol+2B-1)
                 tidx=kl+ku+1+row-tcol; midx=kl+ku+1+row-mcol
                 band[tidx,tcol] -= slope*band[midx,mcol]
             end
@@ -1003,7 +1058,6 @@ function _flame_jacobian(f,u,w,r; previous=nothing,dt=Inf,previous_enthalpy=noth
     if analytic && !update_transport && f isa Union{FreeFlame,BurnerFlame}
         _flame_auto_species_jacobian!(band,f,u,w,r;previous,dt) || begin
             # Unsupported chemistry derivative metadata falls back to full FD.
-            fill!(band,0)
             fallback=_flame_jacobian(f,u,w,r;previous,dt,previous_enthalpy,
                 analytic=false,update_transport,cantera_omission)
             return fallback
@@ -1311,10 +1365,10 @@ function _flame_newton!(f,w; previous=nothing,dt=Inf,maxiters=35,tolerance=1e-8,
                     # factorization (SystemJacobian::updateTransient).
                     flame_residual!(rt,f,u,w)
                     J = _flame_jacobian(f,u,w,rt; analytic,cantera_omission)
-                    copyto!(w.steady_jacobian,J)
+                    copyto!(@view(w.steady_jacobian[bandwidth+1:end,:]),@view(J[bandwidth+1:end,:]))
                     w.jacobian_evals[] += 1
                     _premixed_stats(f).jacobians+=1; PREMIXED_STATS.jacobians+=1
-                    pivots = _flame_factorize!(f,w,rdt)
+                    pivots = _flame_factorize!(f,w,rdt;steady_in_band=true)
                 else
                     J = _flame_jacobian(f,u,w,r; previous,dt,previous_enthalpy,analytic,cantera_omission)
                     _premixed_stats(f).jacobians+=1; PREMIXED_STATS.jacobians+=1
