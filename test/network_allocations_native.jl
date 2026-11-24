@@ -25,6 +25,17 @@ end
     @test fixed.rhs_bytes == 0
     @test fixed.jacobian_bytes == 0
 
+    # A negative trace fraction is admissible and activates signed mass action.
+    trial = network_state(network)
+    ns = gas.n_species
+    trace_mass = 1e-14 * sum(@view trial[1:ns])
+    trial[only(findall(==("H"), gas.species_names))] -= trace_mass
+    trial[only(findall(==("AR"), gas.species_names))] += trace_mass
+    @test !Arrhenius.network_isoutofdomain(network, trial)
+    signed = network_allocation_measurements(rhs, trial, network_jacobian!)
+    @test signed.rhs_bytes == 0
+    @test signed.jacobian_bytes == 0
+
     moving = MovingWallNetwork(network; walls=(
         MovingWall(:chamber,:outlet;velocity=t->0.01sin(t),U=3),
         InertialWall(:inlet,:chamber;mass=0.2,initial_velocity=0.001)))
