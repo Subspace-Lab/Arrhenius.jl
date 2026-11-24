@@ -22,10 +22,10 @@ end
 function _internal_energy_outside_domain(rhs::Arrhenius.InternalEnergyRHS, u)
     (!all(isfinite,u) || minimum(view(u,1:length(u)-1)) < -1e-13) && return true
     try
-        props = Arrhenius.reactor_properties(rhs,u)
+        props = Arrhenius._internal_energy_properties(rhs,u,Arrhenius._InternalEnergyDomainError)
         return !(isfinite(props.temperature) && props.temperature > 0)
     catch error
-        (error isa DomainError || error isa Arrhenius._InternalEnergyInversionError) || rethrow()
+        (error isa Arrhenius._InternalEnergyDomainError || error isa Arrhenius._InternalEnergyInversionError) || rethrow()
         return true
     end
 end

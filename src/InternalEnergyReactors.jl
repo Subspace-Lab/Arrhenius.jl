@@ -51,8 +51,15 @@ function reactor_rhs(r::InternalEnergyReactor)
                              zeros(eltype(x), length(x)-1), zeros(eltype(x), length(x), length(x)))
 end
 
+# Tag only explicit checks in the private adapter path. Public calls keep DomainError.
+struct _InternalEnergyDomainError{E<:DomainError} <: Exception
+    cause::E
+end
+_InternalEnergyDomainError(value, message) = _InternalEnergyDomainError(DomainError(value, message))
+Base.showerror(io::IO, error::_InternalEnergyDomainError) = showerror(io, error.cause)
+
 # Existing species thermodynamics, with unprojected signed mass fractions.
-function _internal_energy_thermo!(rhs::InternalEnergyRHS, temperature, inverse_mw)
+function _internal_energy_thermo!(rhs::InternalEnergyRHS, temperature, inverse_mw, domain_error=DomainError)
     r, w = rhs.reactor.thermal, rhs.thermal_rhs.workspace
     pressure = r.density * R * temperature * inverse_mw
     cal_h_RT!(w.h_mole, r.gas, temperature, pressure, w.X)
@@ -63,7 +70,7 @@ function _internal_energy_thermo!(rhs::InternalEnergyRHS, temperature, inverse_m
     value = dot(rhs.mole_per_mass, w.h_mole) - R * temperature * inverse_mw
     cv = R * (dot(rhs.mole_per_mass, w.cp_R) - inverse_mw)
     isfinite(value) && isfinite(cv) && cv > 0 ||
-        throw(DomainError(temperature, "positive finite heat capacity required during internal-energy inversion"))
+        throw(domain_error(temperature, "positive finite heat capacity required during internal-energy inversion"))
     return value, cv
 end
 
@@ -73,11 +80,11 @@ struct _InternalEnergyInversionError <: Exception
 end
 Base.showerror(io::IO, error::_InternalEnergyInversionError) = print(io, error.reason)
 
-function _internal_energy_temperature!(rhs::InternalEnergyRHS, target, inverse_mw)
-    isfinite(target) || throw(DomainError(target, "finite specific internal energy required"))
+function _internal_energy_temperature!(rhs::InternalEnergyRHS, target, inverse_mw, domain_error=DomainError)
+    isfinite(target) || throw(domain_error(target, "finite specific internal energy required"))
     temperature = rhs.thermal_state[end]
     lo = hi = temperature
-    value, cv = _internal_energy_thermo!(rhs, temperature, inverse_mw)
+    value, cv = _internal_energy_thermo!(rhs, temperature, inverse_mw, domain_error)
     flo = fhi = value - target
     evaluations = 1
     iszero(flo) && return temperature
@@ -85,13 +92,13 @@ function _internal_energy_temperature!(rhs::InternalEnergyRHS, target, inverse_m
     # Safeguarded Newton/bisection replaces Boost's bracketed root algorithm.
     while flo > 0 && evaluations < 100
         lo /= 1.2
-        value, _ = _internal_energy_thermo!(rhs, lo, inverse_mw)
+        value, _ = _internal_energy_thermo!(rhs, lo, inverse_mw, domain_error)
         flo = value - target
         evaluations += 1
     end
     while fhi < 0 && evaluations < 100
         hi *= 1.2
-        value, _ = _internal_energy_thermo!(rhs, hi, inverse_mw)
+        value, _ = _internal_energy_thermo!(rhs, hi, inverse_mw, domain_error)
         fhi = value - target
         evaluations += 1
     end
@@ -99,7 +106,7 @@ function _internal_energy_temperature!(rhs::InternalEnergyRHS, target, inverse_m
     tolerance = max(oftype(temperature, 2.0^-47), 4eps(typeof(temperature)))
     temperature = clamp(temperature, lo, hi)
     while evaluations < 100
-        value, cv = _internal_energy_thermo!(rhs, temperature, inverse_mw)
+        value, cv = _internal_energy_thermo!(rhs, temperature, inverse_mw, domain_error)
         residual = value - target
         evaluations += 1
         iszero(residual) && return temperature
@@ -115,22 +122,22 @@ function _internal_energy_temperature!(rhs::InternalEnergyRHS, target, inverse_m
     throw(_InternalEnergyInversionError("internal-energy temperature inversion did not converge in 100 evaluations"))
 end
 
-function _internal_energy_state!(rhs::InternalEnergyRHS, u)
+function _internal_energy_state!(rhs::InternalEnergyRHS, u, domain_error=DomainError)
     gas = rhs.reactor.thermal.gas
     ns = gas.n_species
     length(u) == ns+1 || throw(DimensionMismatch("internal-energy state must contain n_species + 1 entries"))
-    all(isfinite, u) || throw(DomainError(u, "finite internal-energy state required"))
+    all(isfinite, u) || throw(domain_error(u, "finite internal-energy state required"))
     inverse_mw = zero(eltype(u))
     @inbounds for k in 1:ns
         rhs.thermal_state[k] = u[k]
         rhs.mole_per_mass[k] = u[k] / gas.MW[k]
         inverse_mw += rhs.mole_per_mass[k]
     end
-    inverse_mw > 0 || throw(DomainError(inverse_mw, "positive inverse molecular weight required"))
+    inverse_mw > 0 || throw(domain_error(inverse_mw, "positive inverse molecular weight required"))
     @inbounds for k in 1:ns
         rhs.thermal_rhs.workspace.X[k] = rhs.mole_per_mass[k] / inverse_mw
     end
-    temperature = _internal_energy_temperature!(rhs, u[end], inverse_mw)
+    temperature = _internal_energy_temperature!(rhs, u[end], inverse_mw, domain_error)
     rhs.thermal_state[end] = temperature
     return temperature, inverse_mw
 end
@@ -164,12 +171,13 @@ function reactor_jacobian!(J, u, rhs::InternalEnergyRHS, t=0)
     return nothing
 end
 
-function reactor_properties(rhs::InternalEnergyRHS, u)
-    _internal_energy_state!(rhs, u)
+function _internal_energy_properties(rhs::InternalEnergyRHS, u, domain_error=DomainError)
+    _internal_energy_state!(rhs, u, domain_error)
     props = reactor_properties(rhs.reactor.thermal, rhs.thermal_state)
     # Keep the independent thermodynamic evaluation; do not substitute stored e.
     return (; props..., integrated_internal_energy=u[end])
 end
+reactor_properties(rhs::InternalEnergyRHS, u) = _internal_energy_properties(rhs, u)
 reactor_properties(r::InternalEnergyReactor, u=reactor_state(r)) = reactor_properties(reactor_rhs(r), u)
 
 function reactor_problem(r::InternalEnergyReactor, tspan)

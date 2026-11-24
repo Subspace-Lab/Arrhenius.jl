@@ -100,3 +100,13 @@ ForgeKinetic's dedicated internal-energy CI job rebuilds the pinned public patch
 chain and runs the original physical-state regression plus ownership/adapter
 guards on every PR. The ODE dependencies remain in the separate locked reactor
 environment; the default package test entry retains the lightweight API guards.
+
+The internal-energy domain predicate marks only its explicit finite-state,
+finite-energy, positive inverse-molecular-weight and finite positive heat-capacity
+checks. Those marked failures and the existing temperature-inversion failure are
+recoverable at this predicate boundary. An unrelated `DomainError`, like other
+programming exceptions, propagates unchanged; classification never matches error
+messages. Public property/RHS/Jacobian calls retain their existing exception types.
+This does not add recovery around exceptions thrown directly by an ODE RHS or
+Jacobian callback, or change any other reactor adapter. The physical `1e-7 J`
+criterion and the default temperature-coordinate limitation of #59 remain unchanged.
