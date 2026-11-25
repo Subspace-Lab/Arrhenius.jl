@@ -5,7 +5,7 @@ using Arrhenius,Test
     gas=CreateSolution(mechanism)
     X="H2:1.1,O2:1,AR:5"
     defaults=(;time_step_growth_factor=1.5,time_step_growth_strategy=:fixed_growth,
-        time_step_callback=nothing,time_step_regrid=3,jacobian_mode=:finite_difference)
+        time_step_callback=nothing,time_step_regrid=3,jacobian_mode=:analytic)
     reference=solve!(FreeFlame(gas;X))
     explicit=solve!(FreeFlame(gas;X);defaults...)
     @test explicit.grid==reference.grid && explicit.state==reference.state
@@ -18,9 +18,9 @@ using Arrhenius,Test
         @test !isempty(steps) && all(>(0),steps)
     end
     fd=solve!(FreeFlame(gas;X);jacobian_mode=:finite_difference)
-    @test fd.converged && fd.grid==reference.grid && fd.state==reference.state
+    @test fd.converged && isapprox(flame_speed(fd),speed;rtol=1e-6)
     analytic=solve!(FreeFlame(gas;X);jacobian_mode=:analytic)
-    @test analytic.converged && isapprox(flame_speed(analytic),speed;rtol=1e-6)
+    @test analytic.converged && analytic.grid==reference.grid && analytic.state==reference.state
     compatible=solve!(FreeFlame(gas;X);jacobian_mode=:finite_difference,cantera_compatible=true)
     # Cantera-compatible convergence/damping policies may change the converged
     # state, while the auto Jacobian alias must preserve the grid and converge.
@@ -51,4 +51,41 @@ using Arrhenius,Test
         @test c.converged && isapprox(maximum(temperature(c)),Tmax;rtol=1e-6)
         @test !isempty(steps) && all(>(0),steps)
     end
+end
+
+@testset "default premixed analytic Jacobian and transport fallback" begin
+    mechanism=joinpath(@__DIR__,"..","mechanism","h2o2.yaml")
+    gas=CreateSolution(mechanism)
+    X="H2:2,O2:1,AR:3.76"
+
+    # FreeFlame and BurnerFlame default to residual-faithful :analytic species
+    # columns (matching Cantera's interior analytic Jacobian while retaining
+    # Burner boundary blocks required by the default residual stopping rule).
+    free=solve!(FreeFlame(gas;X,width=.03);slope=.06,curve=.12)
+    @test free.converged
+    @test solver_options(free).jacobian_mode===:analytic
+
+    burner_default=solve!(BurnerFlame(gas;X,mdot=.3,width=.03);slope=.06,curve=.12)
+    burner_fd=solve!(BurnerFlame(gas;X,mdot=.3,width=.03);slope=.06,curve=.12,
+        jacobian_mode=:finite_difference)
+    @test burner_default.converged && burner_fd.converged
+    @test solver_options(burner_default).jacobian_mode===:analytic
+    @test isapprox(maximum(temperature(burner_default)),maximum(temperature(burner_fd));rtol=1e-6)
+
+    # Unsupported transport/basis modes (e.g. flux_gradient_basis=:mass) already
+    # assemble full FD columns in the primary stencil loop and must not trigger
+    # a second redundant FD fallback pass under default jacobian_mode=:analytic.
+    Xmass="H2:1.1,O2:1,AR:5"
+    mass_default=FreeFlame(gas;X=Xmass,width=.03)
+    set_transport!(mass_default,:mixture_averaged;flux_gradient_basis=:mass)
+    solve!(mass_default;slope=.1,curve=.2)
+
+    mass_fd=FreeFlame(gas;X=Xmass,width=.03)
+    set_transport!(mass_fd,:mixture_averaged;flux_gradient_basis=:mass)
+    solve!(mass_fd;slope=.1,curve=.2,jacobian_mode=:finite_difference)
+
+    @test mass_default.converged && mass_fd.converged
+    @test mass_default.state==mass_fd.state
+    @test solver_stats(mass_default).residual_evals==solver_stats(mass_fd).residual_evals
+    @test solver_stats(mass_default).jacobians==solver_stats(mass_fd).jacobians
 end

@@ -13,7 +13,7 @@ solve! adaptively refines a grid by default. Common controls are:
 - max_points and max_time_steps: bounds for the solve.
 - initial_time_step, time_step_growth_factor, and time_step_growth_strategy: pseudo-time stepping controls.
 - time_step_callback and time_step_regrid: observe or recover from stalled time stepping.
-- jacobian_mode=:auto or :finite_difference: use the analytic or numerical Jacobian path where available.
+- jacobian_mode=:analytic, :auto, or :finite_difference: use residual-faithful analytic species columns (default for `FreeFlame` and `BurnerFlame`), Cantera's auto Jacobian (default for counterflow flames and selected by `cantera_compatible=true`), or full finite differences.
 - auto=true: for FreeFlame, use a staged solve and domain expansion; counterflow solvers use their own recovery sequence.
 
 Refinement settings and supported controls vary by flame family. Consult the corresponding constructor and solve! docstrings in the [API reference](api.md).

@@ -1000,7 +1000,9 @@ function _flame_jacobian(f,u,w,r; previous=nothing,dt=Inf,previous_enthalpy=noth
             end
         end
     end
-    if analytic && !update_transport && f isa Union{FreeFlame,BurnerFlame}
+    if analytic && !update_transport && f isa Union{FreeFlame,BurnerFlame} &&
+            f.transport_model == :mixture_averaged && !f.soret_enabled &&
+            f.flux_gradient_basis == :mole
         _flame_auto_species_jacobian!(band,f,u,w,r;previous,dt) || begin
             # Unsupported chemistry derivative metadata falls back to full FD.
             fill!(band,0)
@@ -2239,8 +2241,10 @@ a too-narrow domain; burner flames detect blowoff and return a nonreacting solut
 `newton_options` selects individual Newton policy values. Cantera's time-step controls:
 `time_step_growth_factor`, `time_step_growth_strategy` (`:fixed_growth`,
 `:steady_norm`, `:transient_residual`, `:residual_ratio`, `:newton_iterations`),
-`time_step_callback(dt)`, `time_step_regrid` and `jacobian_mode` (`:finite_difference` by default,
-`:analytic` to enable residual-faithful analytic species columns, or `:auto` to additionally match Cantera's omitted Burner boundary blocks). `cantera_compatible=true` selects `jacobian_mode=:auto` for this solve; it does not change other defaults. `prune` is Cantera's fourth refine criterion: grid
+`time_step_callback(dt)`, `time_step_regrid` and `jacobian_mode` (`:analytic` by default
+for residual-faithful analytic interior species columns matching Cantera's default
+analytic interior Jacobian, `:finite_difference` for all-numerical columns, or `:auto`
+to additionally match Cantera's omitted Burner boundary blocks). `cantera_compatible=true` selects `jacobian_mode=:auto` for this solve; it does not change other defaults. `prune` is Cantera's fourth refine criterion: grid
 points whose slope/curve indicators fall below it are removed on each
 refinement pass (0 disables pruning; it must not exceed `slope` or `curve`).
 """
@@ -2248,7 +2252,7 @@ function solve!(f::AbstractPremixedFlame; refine_grid=true,ratio=3.,slope=.06,cu
         max_points=1000,max_time_steps=500,loglevel=0,
         initial_time_step=1e-5,domain_check=f isa FreeFlame,
         time_step_growth_factor=1.5,time_step_growth_strategy=:fixed_growth,
-        time_step_callback=nothing,time_step_regrid=3,jacobian_mode=:finite_difference,auto=false,
+        time_step_callback=nothing,time_step_regrid=3,jacobian_mode=:analytic,auto=false,
         newton_options=nothing,cantera_compatible::Bool=auto)
     isfinite(ratio) && ratio > 1 && 0 < slope <= 1 && 0 < curve <= 1 || throw(ArgumentError("invalid refinement criteria"))
     isfinite(prune) && prune <= min(slope,curve) || throw(ArgumentError("prune must be finite and no greater than slope or curve"))
