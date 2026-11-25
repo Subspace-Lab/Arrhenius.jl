@@ -197,3 +197,44 @@ end
         @test jac[packed,col]≈expected atol=2e-8
     end
 end
+
+@testset "counterflow refinement resets pseudo-time step to initial_time_step" begin
+    # Cantera SteadyStateSystem::solve initializes local `dt = m_tstep` (1e-5) on
+    # every refined grid pass rather than carrying over a grown dt from a coarser
+    # grid. Verify both CounterflowPremixedFlame and CounterflowDiffusionFlame
+    # reset dt across passes (failing if `timestep[] = initial_time_step` is removed).
+    gas=CreateSolution(joinpath(dirname(pathof(Arrhenius)),"..","mechanism","h2o2.yaml"))
+    dt0=Arrhenius._COUNTERFLOW_INITIAL_TIME_STEP
+    @test dt0==1e-5
+
+    premixed=Arrhenius.CounterflowPremixedFlame(gas;reactants="H2:1.6,O2:1,AR:7",
+        mdot_reactants=.12,mdot_products=.06,T_reactants=373.,P=.05*one_atm,width=.2)
+    per_grid_first_dt=Dict{Int,Float64}()
+    max_seen_dt=Ref(0.0)
+    solve!(premixed;slope=.1,curve=.2,time_step_callback=dt->begin
+        n=length(premixed.grid)
+        haskey(per_grid_first_dt,n) || (per_grid_first_dt[n]=dt)
+        max_seen_dt[]=max(max_seen_dt[],dt)
+    end)
+    @test premixed.converged
+    @test length(per_grid_first_dt)>=2
+    @test max_seen_dt[]>10*dt0
+    # First accepted step on each grid starts from dt0 (so after optional 1.5x growth
+    # or 0.5x cut it stays <= 1.5*dt0, never inheriting a grown >>10*dt0 from prior passes).
+    @test all(dt->dt<=1.5*dt0*(1+1e-12),values(per_grid_first_dt))
+
+    diffusion=CounterflowDiffusionFlame(gas;fuel="H2:1,AR:1",oxidizer="O2:.2,AR:.8",
+        mdot_fuel=.24,mdot_oxidizer=.72,P=one_atm,width=.02,
+        grid=collect(range(0.,.02;length=5)))
+    diff_first_dt=Dict{Int,Float64}()
+    diff_max_dt=Ref(0.0)
+    solve!(diffusion;time_step_callback=dt->begin
+        n=length(diffusion.grid)
+        haskey(diff_first_dt,n) || (diff_first_dt[n]=dt)
+        diff_max_dt[]=max(diff_max_dt[],dt)
+    end)
+    @test diffusion.converged
+    @test length(diff_first_dt)>=2
+    @test diff_max_dt[]>10*dt0
+    @test all(dt->dt<=1.5*dt0*(1+1e-12),values(diff_first_dt))
+end
