@@ -11,9 +11,13 @@ Composition derivatives reuse temperature-only rate factors while differentiatin
 EOS pressure, fugacity activities, colliders and falloff. The temperature column
 uses full automatic differentiation. At zero species the clipped policy uses
 the limit from positive composition; the signed policy retains exact zeros.
-Negative trial species follow the RHS's clipped
-concentration branch by default. An explicit `SignedIntegerShockTubeTrials` policy
-uses its source-matched signed continuation. Neither policy modifies the ODE state.
+For `RedlichKwongReactor`, negative trial species follow the RHS's clipped
+composition branch by default. For `IdealGasReactor`, `ReactorRHS` preserves
+signed trial concentrations directly (matching Cantera's C1/C2/C3 mass-action
+branches), so the ideal-gas AD Jacobian differentiates those signed
+concentrations consistently. An explicit `SignedIntegerShockTubeTrials` policy
+uses its source-matched signed continuation for both reactor types. Neither
+policy modifies the ODE state.
 At a thermo-polynomial split, the derivative follows the selected coefficient
 region. Blowers-Masel rates are outside this helper's validated scope.
 
@@ -72,7 +76,10 @@ function _shocktube_ad_jacobian(reactor,::Val{N},trial_policy::P) where {N,P<:Sh
         composition_rhs = function (du,Y)
             T=current_temperature[]
             @inbounds for k in 1:n
-                work.C[k]=_trial_concentration(trial_policy,Y[k])*reactor.density/gas.MW[k]
+                # IdealGasReactor's ReactorRHS preserves signed trial concentrations
+                # (src/Reactors.jl); match it so negative trial states keep exact
+                # Jacobian columns under both ClippedShockTubeTrials and signed policies.
+                work.C[k]=Y[k]*reactor.density/gas.MW[k]
             end
             _trial_wdot!(trial_policy,work.wdot,gas.reaction,T,work.C,floats.entropy,floats.h_mole,work.kinetics;
                 temperature_cache=cache,rate_multipliers=reactor.rate_multipliers)
