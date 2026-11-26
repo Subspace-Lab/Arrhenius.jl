@@ -221,6 +221,7 @@ struct NetworkRHS{N,S}
     states::S
     state_vector::Vector{NetworkNodeState}
     workspaces::Vector{ReactorWorkspace{Float64}}
+    activity_concentrations::Vector{Vector{Float64}}
     mass_flow_rates::Vector{Float64}
     wall_heat_rates::Vector{Float64}
     energy_flux::Vector{Float64}
@@ -240,7 +241,9 @@ function network_rhs(network::ReactorNetwork)
             initial.density, volume, Float64.(initial.mass_fractions), 0.0, 0.0, 0.0, 0.0)
     end
     workspaces = [ReactorWorkspace(node.initial.gas, Float64) for node in network.nodes]
-    return NetworkRHS(network, states, collect(values(states)), workspaces, zeros(length(network.flows)),
+    activities = [zeros(node isa WellStirredReactor && node.chemistry ? node.initial.gas.n_species : 0)
+                  for node in network.nodes]
+    return NetworkRHS(network, states, collect(values(states)), workspaces, activities, zeros(length(network.flows)),
         zeros(length(network.walls)), zeros(length(network.nodes)), zeros(length(network.nodes)),
         network_state(network), zeros(length(network.initial_state)),
         zeros(length(network.initial_state)), zeros(length(network.initial_state)))
@@ -319,9 +322,15 @@ function (rhs::NetworkRHS)(du, u, p, t; volumes=nothing)
         offset == 0 && return nothing
         gas, workspace, state = node.initial.gas, rhs.workspaces[i], rhs.state_vector[i]
         if node.chemistry
+            activity_concentrations = if any(y -> y < 0, state.mass_fractions)
+                signed = rhs.activity_concentrations[i]
+                @. signed = state.mass_fractions * state.density / gas.MW
+                signed
+            end
             wdot!(workspace.wdot, gas.reaction, state.temperature, workspace.C,
                 workspace.entropy, workspace.h_mole, workspace.kinetics;
-                rate_multipliers=node.initial.rate_multipliers, pressure=state.pressure)
+                rate_multipliers=node.initial.rate_multipliers, pressure=state.pressure,
+                activity_concentrations)
             @inbounds for k in 1:gas.n_species
                 du[offset+k-1] = workspace.wdot[k] * gas.MW[k] * state.volume
             end

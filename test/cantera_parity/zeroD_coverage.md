@@ -38,10 +38,12 @@ executed, or passing test counts. Helper/fixture methods are not test rows.
 
 ## Status, layer, and evidence
 
+The table gives current totals. The case histories below record coverage at the time of each batch.
+
 | Status | Rows | Meaning |
 |---|---:|---|
-| `covered` | 53 | Full upstream behavior with linked user-run or authorized agent-run evidence. |
-| `missing` | 266 | Complete parity coverage is not established; may have related native functionality or a written but unrun port. |
+| `covered` | 54 | Full upstream behavior with linked user-run or authorized agent-run evidence. |
+| `missing` | 265 | Complete parity coverage is not established; may have related native functionality or a written but unrun port. |
 | `not_applicable` | 104 | Specific binding/factory/internal or Graphviz contract, or an explicitly disabled upstream row; each has a reason. |
 
 `missing` does **not** mean the native feature is absent or that a test has
@@ -152,9 +154,9 @@ The agent verified UV and HP combustion equilibrium and shifted initial time (20
 
 `TestIdealGasReactor.test_valve3` and `test_pressure_controller2` now preserve their upstream accepted-step loops. All flow/conservation assertions passed (7505/7505 native assertions); solver step counts and crossing times are recorded separately rather than asserted equal. See the [complete two-case verification](https://github.com/Subspace-Lab/forgekinetic/blob/04923f0e04e822ff806e104014a970118f8946d2/tools/zerodim-parity/batches/11-inventory/arrhenius.patch#L2486).
 
-## Retained pulse failure
+## Triangular mass-flow pulse
 
-The full `TestIdealGasReactor.test_mass_flow_controller` candidate is written and reproducible by explicit selector. Cantera passes, while native runs fail only the final HO2 mass comparison (4.5831e-12 kg against the original 1e-12 kg absolute threshold; 15/16 assertions pass). It remains `missing / agent_failed`, outside the verified `all` group. The [failure record](https://github.com/Subspace-Lab/forgekinetic/blob/04923f0e04e822ff806e104014a970118f8946d2/tools/zerodim-parity/batches/11-inventory/arrhenius.patch#L2917) retains both native runs, the passing reference, diagnostic values and executed-source hashes. No numerical-policy fix or relaxed tolerance is included.
+The original [pulse failure](https://github.com/Subspace-Lab/forgekinetic/blob/04923f0e04e822ff806e104014a970118f8946d2/tools/zerodim-parity/batches/11-inventory/arrhenius.patch#L2917) exceeded the final HO₂ mass limit of 1e-12 kg at 2.5 s. With signed trace activities the pulse passes all 16 assertions at the original tolerances. The [registration record](https://github.com/Subspace-Lab/forgekinetic/blob/04923f0e04e822ff806e104014a970118f8946d2/tools/zerodim-parity/batches/24-ho2-registration/README.md) covers `TestIdealGasReactor.test_mass_flow_controller`, now included in `all`.
 
 ## Time-control, derivative and failure-guard ports
 

@@ -10,7 +10,7 @@ include("reactor_connector_layout.jl")
 include(joinpath(@__DIR__, "..", "..", "example", "reactors", "network_solver.jl"))
 
 # Multiple names select a sequence in one process; no argument runs verified
-# cases. The known failing pulse candidate requires its explicit name.
+# cases, including the repaired mass-flow pulse.
 selected_cases = isempty(ARGS) ? ("all",) : Tuple(ARGS)
 available_cases = ("all", "rk_cv_ignition", "surface_tolerances", "surface_coverages", "hydrogen_const_pressure", "hydrogen_single_jacobian", "connector_mfc_constant", "connector_species_subset", "connector_mfc_energy", "connector_heat_jacobian", "disable_chemistry", "disjoint", "disable_energy",
                    "heat_transfer1", "heat_transfer2", "heat_flux_func",
@@ -24,7 +24,7 @@ available_cases = ("all", "rk_cv_ignition", "surface_tolerances", "surface_cover
 all(name -> name in available_cases, selected_cases) ||
     error("Unknown case; select all or a case documented in README.md")
 case_selected(name) = name in selected_cases ||
-    ("all" in selected_cases && name != "mass_flow_controller")
+    ("all" in selected_cases)
 
 if case_selected("disable_chemistry")
     # This ports the inherited TestIdealGasReactor case, not the other reactor

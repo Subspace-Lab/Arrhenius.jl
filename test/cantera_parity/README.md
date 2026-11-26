@@ -70,7 +70,7 @@ julia --project=. test/cantera_parity/burner_blowoff.jl
 
 ## Zero-dimensional reactor parity
 
-The default package suite runs the [empty-network guard](reactor_core.jl). The optional runner covers 44 Cantera scenarios using the [reactor example environment](../../example/reactors/Project.toml). Its wall-profile comparator has five self-checks. The [coverage inventory](zeroD_coverage.md) maps these checks to the upstream tests and explains the 53 covered, 266 missing and 104 inapplicable rows in the [CSV](zeroD_coverage.csv).
+The default package suite runs the [empty-network guard](reactor_core.jl). The optional runner covers 45 Cantera scenarios using the [reactor example environment](../../example/reactors/Project.toml). Its wall-profile comparator has five self-checks. The [coverage inventory](zeroD_coverage.md) maps these checks to the upstream tests and explains the 54 covered, 265 missing and 104 inapplicable rows in the [CSV](zeroD_coverage.csv).
 
 Run from the repository root with Julia 1.12.7. For the recorded transitive dependency versions, use the [archived environment lock](https://github.com/Subspace-Lab/forgekinetic/blob/04923f0e04e822ff806e104014a970118f8946d2/tools/zerodim-parity/environment/Manifest.toml). The checks use the [frozen Cantera fixtures](fixtures/cantera-726522be/) and require their original bytes. On Windows, use an LF-preserving checkout (`core.autocrlf=false`).
 
@@ -80,12 +80,12 @@ julia --project=example/reactors -e 'using Pkg; Pkg.instantiate()'
 julia --threads=1 --project=example/reactors test/cantera_parity/run_solver_regressions.jl all
 ```
 
-Set `OPENBLAS_NUM_THREADS=1` for single-threaded BLAS. Append one or more selectors in place of `all` to run a subset. The additional explicit selector `mass_flow_controller` reproduces a historical HO2 pulse diagnostic and sits outside the 44-scenario suite. The Python reference scripts use the pinned Cantera build described in the [ForgeKinetic reproduction guide](https://github.com/Subspace-Lab/forgekinetic/blob/04923f0e04e822ff806e104014a970118f8946d2/tools/zerodim-parity/README.md).
+Set `OPENBLAS_NUM_THREADS=1` for single-threaded BLAS. Append one or more selectors in place of `all` to run a subset. The suite includes the [HO₂ pulse regression](https://github.com/Subspace-Lab/forgekinetic/blob/04923f0e04e822ff806e104014a970118f8946d2/tools/zerodim-parity/batches/24-ho2-registration/README.md), which can also run individually. The Python reference scripts use the pinned Cantera build described in the [ForgeKinetic reproduction guide](https://github.com/Subspace-Lab/forgekinetic/blob/04923f0e04e822ff806e104014a970118f8946d2/tools/zerodim-parity/README.md).
 
 On Windows, the PowerShell 7 wrapper accepts a process deadline and a fresh directory for logs, timings and trajectories. Run the connector layout and process-control guards separately.
 
 ```powershell
-./test/cantera_parity/run_solver_regressions.ps1 -Cases all -TimeoutSeconds 2400 -OutputDirectory ./test/cantera_parity/local-results/all44
+./test/cantera_parity/run_solver_regressions.ps1 -Cases all -TimeoutSeconds 2400 -OutputDirectory ./test/cantera_parity/local-results/all45
 julia --project=example/reactors test/cantera_parity/connector_layout_checks.jl
 pwsh -File test/cantera_parity/runner_checks.ps1 -OutputDirectory ./test/cantera_parity/local-results/runner-guards
 ```
@@ -98,6 +98,7 @@ pwsh -File test/cantera_parity/runner_checks.ps1 -OutputDirectory ./test/cantera
 | `connector_species_subset` | Three-species upstream MFC into ten species: full T/V/species cross rows, including actual volume perturbations, preserving all13 original assertions. |
 | `connector_mfc_energy` | Static energy-enabled MFC temperature and mole-coordinate species cross derivatives versus independent source-scaled finite differences, preserving all three original assertions. |
 | `connector_heat_jacobian` | Static heat-wall cross-temperature derivatives versus independent finite differences and UA/(m cv), preserving all four original assertions. |
+| `mass_flow_controller` | A triangular hydrogen inlet pulse into oxygen checks injected mass, flow rates and all ten final species masses. |
 | `disable_chemistry` | Disabled chemistry preserves temperature and composition through 11 s. |
 | `combustor_step` | Hydrogen combustor with a Gaussian radical pulse: accepted steps through 0.25 s, compared to the pinned full temperature/mole-fraction profile. |
 | `combustor_advance` | The same combustor at the original100 output times through0.25 s, using Advance's stricter profile limits. |
