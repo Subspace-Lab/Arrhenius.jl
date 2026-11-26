@@ -397,7 +397,7 @@ linear interpolation of the stored mass-flux component.
 """
 function solve!(f::AbstractPremixedCounterflow;refine_grid=true,ratio=3.,slope=.1,curve=.2,
         prune=0.,grid_min=1e-10,max_points=1200,max_time_steps=800,loglevel=0,
-        initial_time_step=Arrhenius._COUNTERFLOW_FD_INITIAL_TIME_STEP,auto=true,
+        initial_time_step=Arrhenius._COUNTERFLOW_INITIAL_TIME_STEP,auto=true,
         time_step_growth_factor=1.5,time_step_growth_strategy=:fixed_growth,
         time_step_callback=nothing,time_step_regrid=0,jacobian_mode=:auto,
         refinement_interpolation=:velocity,newton_options=nothing,cantera_compatible::Bool=false)
@@ -445,8 +445,10 @@ function solve!(f::AbstractPremixedCounterflow;refine_grid=true,ratio=3.,slope=.
             loglevel>0 && println("Recovering with native initial temperature profile")
             _counterflow_reset!(f,copy(f.grid))
             f.fixed_temperature=temperature(f)
+            timestep[]=initial_time_step
             success=steady!(f)
             empty!(f.fixed_temperature)
+            timestep[]=initial_time_step
             success && (success=steady!(f))
         end
         while !success && refine_grid && regrids<time_step_regrid &&
@@ -463,6 +465,10 @@ function solve!(f::AbstractPremixedCounterflow;refine_grid=true,ratio=3.,slope=.
             f.converged=true
             return f
         end
+        # Match Cantera SteadyStateSystem::solve (`double dt = m_tstep;`):
+        # each refined grid starts pseudo-time stepping from initial_time_step
+        # rather than carrying over a grown dt from the coarser grid.
+        timestep[]=initial_time_step
         loglevel>0 && println("Premixed counterflow solve on ",length(f.grid)," points")
         while !steady!(f)
             # Cantera's time_step_regrid: refine the failed state and retry.

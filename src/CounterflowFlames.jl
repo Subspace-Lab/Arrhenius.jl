@@ -1027,7 +1027,7 @@ boundary-residual parity before using it.
 """
 function solve!(f::CounterflowDiffusionFlame;refine_grid=true,ratio=4.,slope=.2,curve=.3,prune=0.,
         max_points=1200,max_time_steps=800,loglevel=0,
-        initial_time_step=_COUNTERFLOW_FD_INITIAL_TIME_STEP,auto=true,
+        initial_time_step=_COUNTERFLOW_INITIAL_TIME_STEP,auto=true,
         time_step_growth_factor=1.5,time_step_growth_strategy=:fixed_growth,
         time_step_callback=nothing,time_step_regrid=0,jacobian_mode=:auto,
         _transient_update! = _counterflow_transient_update!,
@@ -1068,6 +1068,9 @@ function solve!(f::CounterflowDiffusionFlame;refine_grid=true,ratio=4.,slope=.2,
             _counterflow_reset!(f,collect(range(f.grid[1],f.grid[end];length=N)))
             timestep[]=initial_time_step
         end
+        # Match Cantera SteadyStateSystem::solve (`double dt = m_tstep;`):
+        # each refined grid starts pseudo-time stepping from initial_time_step.
+        timestep[]=initial_time_step
         loglevel>0 && println("Counterflow solve on ",length(f.grid)," points")
         success=steady!(f)
         if auto && (!success || extinct(f))
@@ -1075,9 +1078,11 @@ function solve!(f::CounterflowDiffusionFlame;refine_grid=true,ratio=4.,slope=.2,
             loglevel>0 && println("Recovering with the native initial temperature profile")
             _counterflow_reset!(f,copy(f.grid))
             f.fixed_temperature=temperature(f)
+            timestep[]=initial_time_step
             success=steady!(f)
             empty!(f.fixed_temperature)
             if success
+                timestep[]=initial_time_step
                 success=steady!(f)
             end
         end
@@ -1105,6 +1110,9 @@ function solve!(f::CounterflowDiffusionFlame;refine_grid=true,ratio=4.,slope=.2,
             f.converged=true
             return f
         end
+        # Match Cantera SteadyStateSystem::solve (`double dt = m_tstep;`):
+        # each refined grid starts pseudo-time stepping from initial_time_step.
+        timestep[]=initial_time_step
         loglevel>0 && println("Counterflow solve on ",length(f.grid)," points")
         while !steady!(f)
             # Cantera's time_step_regrid: refine the failed state and retry.

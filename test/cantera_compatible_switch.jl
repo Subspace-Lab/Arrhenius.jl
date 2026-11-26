@@ -78,7 +78,7 @@ end
 
     cf_defaults = (refine_grid=true, ratio=4.0, slope=.2, curve=.3, prune=0.0,
         max_points=1200, max_time_steps=800, loglevel=0,
-        initial_time_step=Arrhenius._COUNTERFLOW_FD_INITIAL_TIME_STEP,
+        initial_time_step=Arrhenius._COUNTERFLOW_INITIAL_TIME_STEP,
         time_step_growth_factor=1.5, time_step_growth_strategy=:fixed_growth,
         time_step_callback=nothing, time_step_regrid=0)
     cf_expected() = (jacobian_mode=:auto, staged_ladder=false, auto=true, defaults=cf_defaults)
@@ -91,7 +91,7 @@ end
 
     pcf_defaults = (refine_grid=true, ratio=3.0, slope=.1, curve=.2, prune=0.0,
         grid_min=1e-10, max_points=1200, max_time_steps=800, loglevel=0,
-        initial_time_step=Arrhenius._COUNTERFLOW_FD_INITIAL_TIME_STEP,
+        initial_time_step=Arrhenius._COUNTERFLOW_INITIAL_TIME_STEP,
         time_step_growth_factor=1.5, time_step_growth_strategy=:fixed_growth,
         time_step_callback=nothing, time_step_regrid=0, refinement_interpolation=:velocity)
     pcf_expected() = (jacobian_mode=:auto, staged_ladder=false, auto=true, defaults=pcf_defaults)
