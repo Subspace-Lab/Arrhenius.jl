@@ -1,0 +1,14 @@
+cantera_commit = "726522be4e2a13454d8415b7ef799d621f665cf3"
+upstream_test = "test/zeroD/test_zeroD.cpp::zerodim.simple"
+source_file = "data/gri30.yaml"
+mechanism_git_blob = "9a62004ec17bbec8ac11e97785932d426dd58610"
+mechanism_file = "gri30.yaml"
+mechanism_sha256_lf = "06650b1e0ee0012f6903d5328b1bb218cb6007d07f8ebe375d18f24811039345"
+phase = "gri30"
+species_count = 53
+reaction_count = 325
+species_names = ["H2", "H", "O", "O2", "OH", "H2O", "HO2", "H2O2", "C", "CH", "CH2", "CH2(S)", "CH3", "CH4", "CO", "CO2", "HCO", "CH2O", "CH2OH", "CH3O", "CH3OH", "C2H", "C2H2", "C2H3", "C2H4", "C2H5", "C2H6", "HCCO", "CH2CO", "HCCOH", "N", "NH", "NH2", "NH3", "NNH", "NO", "NO2", "N2O", "HNO", "CN", "HCN", "H2CN", "HCNN", "HCNO", "HOCN", "HNCO", "NCO", "N2", "AR", "C3H7", "C3H8", "CH2CHO", "CH3CHO"]
+source_cpp_sha256_lf = "18cec1895658b480216c66cb6d52688bb76ab5f1a44f097b1b06af0f9da66233"
+transport_model_reference = "none"
+integration_rtol = 1e-09
+integration_atol = 1e-15

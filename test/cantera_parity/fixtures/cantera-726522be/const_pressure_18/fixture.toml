@@ -1,0 +1,13 @@
+cantera_commit = "726522be4e2a13454d8415b7ef799d621f665cf3"
+phase = "gas"
+species_count = 18
+reaction_count = 74
+duplicate_count = 6
+source_gri30_sha256_lf = "06650b1e0ee0012f6903d5328b1bb218cb6007d07f8ebe375d18f24811039345"
+source_gas_def_sha256_lf = "801614428053e316519d0ad57e4ae9a34fc4646a970c4a5acc825165cab9bee6"
+raw_file = "gri30-18.raw.yaml"
+raw_sha256_lf = "9b223025835b3b7db696e3553cd2a7f59b6562f28052883f9184d849db608c61"
+normalized_file = "gri30-18.normalized.yaml"
+normalized_sha256_lf = "c6008fdf4d60ac0d28d96db989f8bce2cea59ece44625ff8568fea633f54aa19"
+equivalence_file = "equivalence.json"
+equivalence_sha256_lf = "b5858f59ab83f3d57bdecfa68dd37eec51290453153af22ae5a899d459bf514e"

@@ -1,0 +1,15 @@
+cantera_commit = "726522be4e2a13454d8415b7ef799d621f665cf3"
+upstream_test = "test/python/test_reactor.py::TestConnectorJacobians::test_species_subset_mfc_cross_reactor"
+phase = "upstream_gas"
+species_names = ["H2", "O2", "AR"]
+species_count = 3
+reaction_count = 0
+definition_sha256_lf = "36c2f00ff55266e55ad171c074e58cc9a9f75da4103bcca976c9f7a8630e9a5d"
+source_h2o2_sha256_lf = "0efc6c52862741a29e0c29b65d979c7d8cb409db5282bca83b9c5437b3d8c8d4"
+raw_file = "upstream.raw.yaml"
+raw_sha256_lf = "689521645965946d4f8b981f21ac13dc6d979223b76504287591e1804c0cf9d5"
+normalized_file = "upstream.normalized.yaml"
+normalized_sha256_lf = "b7a59f95e59c02ec9f0f7860328cafecf6a764933d9f83c96ff93f12f8ed9193"
+equivalence_sha256_lf = "c959941185d30ee9898d2599cb271099e4f62c9d5586602035112eac5f6e3b46"
+integration_rtol = 1e-09
+integration_atol = 1e-15

@@ -1,0 +1,1255 @@
+{
+  "environment": {
+    "checked_at_utc": "2026-11-02T02:39:12.138245+00:00",
+    "upstream_test": "test/python/test_reactor.py::TestIdealGasReactor::test_disable_chemistry",
+    "cantera_version": "4.0.0a2",
+    "cantera_git_commit": "726522be4",
+    "source_dir": "/home/subspace/src/cantera-726522be",
+    "source_commit": "726522be4e2a13454d8415b7ef799d621f665cf3",
+    "source_tracked_clean": true,
+    "cantera_module": "/home/subspace/.venvs/cantera-726522be/lib/python3.12/site-packages/cantera/__init__.py",
+    "cantera_extension": "/home/subspace/.venvs/cantera-726522be/lib/python3.12/site-packages/cantera/_utils.cpython-312-x86_64-linux-gnu.so",
+    "python_executable": "/home/subspace/.venvs/cantera-726522be/bin/python",
+    "python_version": "3.12.3",
+    "platform": "Linux-6.18.33.2-microsoft-standard-WSL2-x86_64-with-glibc2.39",
+    "sundials_version": "7.5.0",
+    "mechanism": "/mnt/c/Users/DELL/Documents/GitHub/Arrhenius.jl/test/cantera_parity/fixtures/cantera-726522be/h2o2.yaml",
+    "mechanism_sha256_lf": "0efc6c52862741a29e0c29b65d979c7d8cb409db5282bca83b9c5437b3d8c8d4",
+    "phase": "ohmech"
+  },
+  "gas_def": "\n            phases:\n            - name: upstream_gas\n              thermo: ideal-gas\n              species:\n              - h2o2.yaml/species: [H2, O2, AR]\n              kinetics: gas\n              reactions: none\n        ",
+  "gas_def_sha256_lf": "36c2f00ff55266e55ad171c074e58cc9a9f75da4103bcca976c9f7a8630e9a5d",
+  "write_yaml_precision": 17,
+  "only_change": "phases[0].reactions: none -> []",
+  "species": [
+    "H2",
+    "O2",
+    "AR"
+  ],
+  "reaction_count": 0,
+  "duplicate_count": 0,
+  "states": [
+    {
+      "input": {
+        "T": 1000,
+        "P": 202650,
+        "X": "H2:2,O2:1,AR:8"
+      },
+      "snapshots": {
+        "source": {
+          "T": [
+            1000.0
+          ],
+          "P": [
+            202649.99999999997
+          ],
+          "X": [
+            0.1818181818181818,
+            0.0909090909090909,
+            0.7272727272727272
+          ],
+          "Y": [
+            0.011337626184517616,
+            0.0899755363720721,
+            0.8986868374434103
+          ],
+          "density": [
+            0.7879853215883745
+          ],
+          "molecular_weights": [
+            2.016,
+            31.998,
+            39.95
+          ],
+          "partial_molar_enthalpies": [
+            20686533.901461784,
+            22706810.919792503,
+            14588763.971377129
+          ],
+          "partial_molar_int_energies": [
+            12372071.283308543,
+            14392348.301639264,
+            6274301.353223888
+          ],
+          "partial_molar_cp": [
+            30163.14645798072,
+            34882.974466656015,
+            20786.1565453831
+          ],
+          "partial_molar_entropies": [
+            174646.63812044446,
+            257760.45770203441,
+            176771.25171832877
+          ],
+          "net_production_rates": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "forward_rate_constants": [],
+          "reverse_rate_constants": []
+        },
+        "raw_reloaded": {
+          "T": [
+            1000.0
+          ],
+          "P": [
+            202649.99999999997
+          ],
+          "X": [
+            0.1818181818181818,
+            0.0909090909090909,
+            0.7272727272727272
+          ],
+          "Y": [
+            0.011337626184517616,
+            0.0899755363720721,
+            0.8986868374434103
+          ],
+          "density": [
+            0.7879853215883745
+          ],
+          "molecular_weights": [
+            2.016,
+            31.998,
+            39.95
+          ],
+          "partial_molar_enthalpies": [
+            20686533.901461784,
+            22706810.919792503,
+            14588763.971377129
+          ],
+          "partial_molar_int_energies": [
+            12372071.283308543,
+            14392348.301639264,
+            6274301.353223888
+          ],
+          "partial_molar_cp": [
+            30163.14645798072,
+            34882.974466656015,
+            20786.1565453831
+          ],
+          "partial_molar_entropies": [
+            174646.63812044446,
+            257760.45770203441,
+            176771.25171832877
+          ],
+          "net_production_rates": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "forward_rate_constants": [],
+          "reverse_rate_constants": []
+        },
+        "normalized": {
+          "T": [
+            1000.0
+          ],
+          "P": [
+            202649.99999999997
+          ],
+          "X": [
+            0.1818181818181818,
+            0.0909090909090909,
+            0.7272727272727272
+          ],
+          "Y": [
+            0.011337626184517616,
+            0.0899755363720721,
+            0.8986868374434103
+          ],
+          "density": [
+            0.7879853215883745
+          ],
+          "molecular_weights": [
+            2.016,
+            31.998,
+            39.95
+          ],
+          "partial_molar_enthalpies": [
+            20686533.901461784,
+            22706810.919792503,
+            14588763.971377129
+          ],
+          "partial_molar_int_energies": [
+            12372071.283308543,
+            14392348.301639264,
+            6274301.353223888
+          ],
+          "partial_molar_cp": [
+            30163.14645798072,
+            34882.974466656015,
+            20786.1565453831
+          ],
+          "partial_molar_entropies": [
+            174646.63812044446,
+            257760.45770203441,
+            176771.25171832877
+          ],
+          "net_production_rates": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "forward_rate_constants": [],
+          "reverse_rate_constants": []
+        }
+      },
+      "metrics": {
+        "raw_reloaded": {
+          "T": {
+            "entries": 1,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "P": {
+            "entries": 1,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "X": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "Y": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "density": {
+            "entries": 1,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "molecular_weights": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_enthalpies": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_int_energies": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_cp": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_entropies": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "net_production_rates": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "forward_rate_constants": {
+            "entries": 0,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "reverse_rate_constants": {
+            "entries": 0,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          }
+        },
+        "normalized": {
+          "T": {
+            "entries": 1,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "P": {
+            "entries": 1,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "X": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "Y": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "density": {
+            "entries": 1,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "molecular_weights": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_enthalpies": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_int_energies": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_cp": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_entropies": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "net_production_rates": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "forward_rate_constants": {
+            "entries": 0,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "reverse_rate_constants": {
+            "entries": 0,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "T": 900,
+        "P": 101325,
+        "X": "H2:1,O2:0.5,AR:8"
+      },
+      "snapshots": {
+        "source": {
+          "T": [
+            900.0
+          ],
+          "P": [
+            101325.0
+          ],
+          "X": [
+            0.10526315789473684,
+            0.05263157894736842,
+            0.8421052631578947
+          ],
+          "Y": [
+            0.005971298668601809,
+            0.047388297320912875,
+            0.9466404040104853
+          ],
+          "density": [
+            0.48121377018079103
+          ],
+          "molecular_weights": [
+            2.016,
+            31.998,
+            39.95
+          ],
+          "partial_molar_enthalpies": [
+            17677084.474848334,
+            19244552.272305354,
+            12510148.31683882
+          ],
+          "partial_molar_int_energies": [
+            10194068.118510418,
+            11761535.91596744,
+            5027131.9605009025
+          ],
+          "partial_molar_cp": [
+            29970.581123139014,
+            34357.49059357024,
+            20786.1565453831
+          ],
+          "partial_molar_entropies": [
+            181783.41545108665,
+            264420.45175472606,
+            179125.42876194714
+          ],
+          "net_production_rates": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "forward_rate_constants": [],
+          "reverse_rate_constants": []
+        },
+        "raw_reloaded": {
+          "T": [
+            900.0
+          ],
+          "P": [
+            101325.0
+          ],
+          "X": [
+            0.10526315789473684,
+            0.05263157894736842,
+            0.8421052631578947
+          ],
+          "Y": [
+            0.005971298668601809,
+            0.047388297320912875,
+            0.9466404040104853
+          ],
+          "density": [
+            0.48121377018079103
+          ],
+          "molecular_weights": [
+            2.016,
+            31.998,
+            39.95
+          ],
+          "partial_molar_enthalpies": [
+            17677084.474848334,
+            19244552.272305354,
+            12510148.31683882
+          ],
+          "partial_molar_int_energies": [
+            10194068.118510418,
+            11761535.91596744,
+            5027131.9605009025
+          ],
+          "partial_molar_cp": [
+            29970.581123139014,
+            34357.49059357024,
+            20786.1565453831
+          ],
+          "partial_molar_entropies": [
+            181783.41545108665,
+            264420.45175472606,
+            179125.42876194714
+          ],
+          "net_production_rates": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "forward_rate_constants": [],
+          "reverse_rate_constants": []
+        },
+        "normalized": {
+          "T": [
+            900.0
+          ],
+          "P": [
+            101325.0
+          ],
+          "X": [
+            0.10526315789473684,
+            0.05263157894736842,
+            0.8421052631578947
+          ],
+          "Y": [
+            0.005971298668601809,
+            0.047388297320912875,
+            0.9466404040104853
+          ],
+          "density": [
+            0.48121377018079103
+          ],
+          "molecular_weights": [
+            2.016,
+            31.998,
+            39.95
+          ],
+          "partial_molar_enthalpies": [
+            17677084.474848334,
+            19244552.272305354,
+            12510148.31683882
+          ],
+          "partial_molar_int_energies": [
+            10194068.118510418,
+            11761535.91596744,
+            5027131.9605009025
+          ],
+          "partial_molar_cp": [
+            29970.581123139014,
+            34357.49059357024,
+            20786.1565453831
+          ],
+          "partial_molar_entropies": [
+            181783.41545108665,
+            264420.45175472606,
+            179125.42876194714
+          ],
+          "net_production_rates": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "forward_rate_constants": [],
+          "reverse_rate_constants": []
+        }
+      },
+      "metrics": {
+        "raw_reloaded": {
+          "T": {
+            "entries": 1,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "P": {
+            "entries": 1,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "X": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "Y": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "density": {
+            "entries": 1,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "molecular_weights": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_enthalpies": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_int_energies": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_cp": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_entropies": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "net_production_rates": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "forward_rate_constants": {
+            "entries": 0,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "reverse_rate_constants": {
+            "entries": 0,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          }
+        },
+        "normalized": {
+          "T": {
+            "entries": 1,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "P": {
+            "entries": 1,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "X": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "Y": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "density": {
+            "entries": 1,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "molecular_weights": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_enthalpies": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_int_energies": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_cp": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_entropies": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "net_production_rates": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "forward_rate_constants": {
+            "entries": 0,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "reverse_rate_constants": {
+            "entries": 0,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "T": 300,
+        "P": 101325,
+        "X": "H2:1,O2:1,AR:1"
+      },
+      "snapshots": {
+        "source": {
+          "T": [
+            300.0
+          ],
+          "P": [
+            101325.00000000001
+          ],
+          "X": [
+            0.3333333333333333,
+            0.3333333333333333,
+            0.3333333333333333
+          ],
+          "Y": [
+            0.02725650316370126,
+            0.43261586717862743,
+            0.5401276296576714
+          ],
+          "density": [
+            1.0015215713984698
+          ],
+          "molecular_weights": [
+            2.016,
+            31.998,
+            39.95
+          ],
+          "partial_molar_enthalpies": [
+            53360.50519888915,
+            54358.77860916037,
+            38454.389608958096
+          ],
+          "partial_molar_int_energies": [
+            -2440978.280247083,
+            -2439980.0068368115,
+            -2455884.3958370136
+          ],
+          "partial_molar_cp": [
+            28850.784994825448,
+            29388.071132483976,
+            20786.1565453831
+          ],
+          "partial_molar_entropies": [
+            139993.05953702872,
+            214464.4257062567,
+            163995.03001584823
+          ],
+          "net_production_rates": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "forward_rate_constants": [],
+          "reverse_rate_constants": []
+        },
+        "raw_reloaded": {
+          "T": [
+            300.0
+          ],
+          "P": [
+            101325.00000000001
+          ],
+          "X": [
+            0.3333333333333333,
+            0.3333333333333333,
+            0.3333333333333333
+          ],
+          "Y": [
+            0.02725650316370126,
+            0.43261586717862743,
+            0.5401276296576714
+          ],
+          "density": [
+            1.0015215713984698
+          ],
+          "molecular_weights": [
+            2.016,
+            31.998,
+            39.95
+          ],
+          "partial_molar_enthalpies": [
+            53360.50519888915,
+            54358.77860916037,
+            38454.389608958096
+          ],
+          "partial_molar_int_energies": [
+            -2440978.280247083,
+            -2439980.0068368115,
+            -2455884.3958370136
+          ],
+          "partial_molar_cp": [
+            28850.784994825448,
+            29388.071132483976,
+            20786.1565453831
+          ],
+          "partial_molar_entropies": [
+            139993.05953702872,
+            214464.4257062567,
+            163995.03001584823
+          ],
+          "net_production_rates": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "forward_rate_constants": [],
+          "reverse_rate_constants": []
+        },
+        "normalized": {
+          "T": [
+            300.0
+          ],
+          "P": [
+            101325.00000000001
+          ],
+          "X": [
+            0.3333333333333333,
+            0.3333333333333333,
+            0.3333333333333333
+          ],
+          "Y": [
+            0.02725650316370126,
+            0.43261586717862743,
+            0.5401276296576714
+          ],
+          "density": [
+            1.0015215713984698
+          ],
+          "molecular_weights": [
+            2.016,
+            31.998,
+            39.95
+          ],
+          "partial_molar_enthalpies": [
+            53360.50519888915,
+            54358.77860916037,
+            38454.389608958096
+          ],
+          "partial_molar_int_energies": [
+            -2440978.280247083,
+            -2439980.0068368115,
+            -2455884.3958370136
+          ],
+          "partial_molar_cp": [
+            28850.784994825448,
+            29388.071132483976,
+            20786.1565453831
+          ],
+          "partial_molar_entropies": [
+            139993.05953702872,
+            214464.4257062567,
+            163995.03001584823
+          ],
+          "net_production_rates": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "forward_rate_constants": [],
+          "reverse_rate_constants": []
+        }
+      },
+      "metrics": {
+        "raw_reloaded": {
+          "T": {
+            "entries": 1,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "P": {
+            "entries": 1,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "X": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "Y": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "density": {
+            "entries": 1,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "molecular_weights": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_enthalpies": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_int_energies": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_cp": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_entropies": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "net_production_rates": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "forward_rate_constants": {
+            "entries": 0,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "reverse_rate_constants": {
+            "entries": 0,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          }
+        },
+        "normalized": {
+          "T": {
+            "entries": 1,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "P": {
+            "entries": 1,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "X": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "Y": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "density": {
+            "entries": 1,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "molecular_weights": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_enthalpies": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_int_energies": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_cp": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_entropies": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "net_production_rates": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "forward_rate_constants": {
+            "entries": 0,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "reverse_rate_constants": {
+            "entries": 0,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          }
+        }
+      }
+    },
+    {
+      "input": {
+        "T": 2500,
+        "P": 202650,
+        "X": "H2:1,O2:1,AR:1"
+      },
+      "snapshots": {
+        "source": {
+          "T": [
+            2500.0
+          ],
+          "P": [
+            202650.0
+          ],
+          "X": [
+            0.3333333333333333,
+            0.3333333333333333,
+            0.3333333333333333
+          ],
+          "Y": [
+            0.02725650316370126,
+            0.43261586717862743,
+            0.5401276296576714
+          ],
+          "density": [
+            0.2403651771356327
+          ],
+          "molecular_weights": [
+            2.016,
+            31.998,
+            39.95
+          ],
+          "partial_molar_enthalpies": [
+            70486184.84947203,
+            78381489.40135379,
+            45767998.78945178
+          ],
+          "partial_molar_int_energies": [
+            49700028.30408893,
+            57595332.85597069,
+            24981842.244068675
+          ],
+          "partial_molar_cp": [
+            35851.135819766925,
+            38906.6011566014,
+            20786.1565453831
+          ],
+          "partial_molar_entropies": [
+            199622.6340222663,
+            280695.0150039235,
+            202304.01347512688
+          ],
+          "net_production_rates": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "forward_rate_constants": [],
+          "reverse_rate_constants": []
+        },
+        "raw_reloaded": {
+          "T": [
+            2500.0
+          ],
+          "P": [
+            202650.0
+          ],
+          "X": [
+            0.3333333333333333,
+            0.3333333333333333,
+            0.3333333333333333
+          ],
+          "Y": [
+            0.02725650316370126,
+            0.43261586717862743,
+            0.5401276296576714
+          ],
+          "density": [
+            0.2403651771356327
+          ],
+          "molecular_weights": [
+            2.016,
+            31.998,
+            39.95
+          ],
+          "partial_molar_enthalpies": [
+            70486184.84947203,
+            78381489.40135379,
+            45767998.78945178
+          ],
+          "partial_molar_int_energies": [
+            49700028.30408893,
+            57595332.85597069,
+            24981842.244068675
+          ],
+          "partial_molar_cp": [
+            35851.135819766925,
+            38906.6011566014,
+            20786.1565453831
+          ],
+          "partial_molar_entropies": [
+            199622.6340222663,
+            280695.0150039235,
+            202304.01347512688
+          ],
+          "net_production_rates": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "forward_rate_constants": [],
+          "reverse_rate_constants": []
+        },
+        "normalized": {
+          "T": [
+            2500.0
+          ],
+          "P": [
+            202650.0
+          ],
+          "X": [
+            0.3333333333333333,
+            0.3333333333333333,
+            0.3333333333333333
+          ],
+          "Y": [
+            0.02725650316370126,
+            0.43261586717862743,
+            0.5401276296576714
+          ],
+          "density": [
+            0.2403651771356327
+          ],
+          "molecular_weights": [
+            2.016,
+            31.998,
+            39.95
+          ],
+          "partial_molar_enthalpies": [
+            70486184.84947203,
+            78381489.40135379,
+            45767998.78945178
+          ],
+          "partial_molar_int_energies": [
+            49700028.30408893,
+            57595332.85597069,
+            24981842.244068675
+          ],
+          "partial_molar_cp": [
+            35851.135819766925,
+            38906.6011566014,
+            20786.1565453831
+          ],
+          "partial_molar_entropies": [
+            199622.6340222663,
+            280695.0150039235,
+            202304.01347512688
+          ],
+          "net_production_rates": [
+            0.0,
+            0.0,
+            0.0
+          ],
+          "forward_rate_constants": [],
+          "reverse_rate_constants": []
+        }
+      },
+      "metrics": {
+        "raw_reloaded": {
+          "T": {
+            "entries": 1,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "P": {
+            "entries": 1,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "X": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "Y": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "density": {
+            "entries": 1,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "molecular_weights": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_enthalpies": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_int_energies": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_cp": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_entropies": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "net_production_rates": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "forward_rate_constants": {
+            "entries": 0,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "reverse_rate_constants": {
+            "entries": 0,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          }
+        },
+        "normalized": {
+          "T": {
+            "entries": 1,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "P": {
+            "entries": 1,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "X": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "Y": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "density": {
+            "entries": 1,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "molecular_weights": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_enthalpies": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_int_energies": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_cp": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "partial_molar_entropies": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "net_production_rates": {
+            "entries": 3,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "forward_rate_constants": {
+            "entries": 0,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          },
+          "reverse_rate_constants": {
+            "entries": 0,
+            "max_absolute_error": 0.0,
+            "max_relative_error_nonzero_reference": 0.0
+          }
+        }
+      }
+    }
+  ],
+  "rtol": 1e-06,
+  "atol": 1e-12,
+  "tolerance_source": "test_composite.py TestSolutionSerialization.test_yaml_simple",
+  "input_equivalence_passed": true,
+  "raw_sha256_lf": "689521645965946d4f8b981f21ac13dc6d979223b76504287591e1804c0cf9d5",
+  "normalized_sha256_lf": "b7a59f95e59c02ec9f0f7860328cafecf6a764933d9f83c96ff93f12f8ed9193"
+}

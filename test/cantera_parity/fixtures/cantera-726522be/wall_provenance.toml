@@ -1,0 +1,6 @@
+cantera_commit = "726522be4e2a13454d8415b7ef799d621f665cf3"
+air_phase = "air"
+air_source = "data/air.yaml"
+air_sha256_lf = "c352ce80a7d9e673d3436968ed5833799a6dc874f9ea3fee9e01506632d9ceca"
+profile_source = "test/data/WallTest-integrateWithAdvance.csv"
+profile_sha256_lf = "6bd341bb774db0ee84868e2c38fac9530f637bf5ac9e4bebed9d8d6699cd934a"

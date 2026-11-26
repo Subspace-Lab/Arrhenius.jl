@@ -1,0 +1,13 @@
+cantera_commit = "726522be4e2a13454d8415b7ef799d621f665cf3"
+integration_rtol = 1e-9
+integration_atol = 1e-15
+profile_rtol = 1e-5
+profile_atol = 1e-9
+profile_xtol = 1e-12
+
+[sha256]
+"diamond.yaml" = "3399e251d6e6af5333c17d480a6d5e12a63bada54c31892327e3b19683cf1baa"
+"diamond.gas.yaml" = "8b0ba9bb38992f7c9a48d9b4e50d9780d0b3d74a81431a1341c4a77b67945a1e"
+"diamond.source.yaml" = "b73d28dfdea66a6b97e66c682b7de32c2c00a874fc40e642dd95b6a355902bf2"
+"diamond.npz" = "eec9bf343ce7c353fd1109a7b91793cf17eca2cd25f4499e8db504ac6174bab0"
+"reference.csv" = "ee81654e6627c6a552d88fe89910a80b00d91f9c722e1318d012f098aac342c2"
