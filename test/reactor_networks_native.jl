@@ -143,3 +143,45 @@ end
     @test isapprox(rhs.workspaces[1].kinetics.rates_of_progress[143],
         633.08866652485551; rtol=1e-10)
 end
+
+@testset "constant reservoir inlet does not mask outlet species Jacobian" begin
+    # Existing Cantera TestSteadySolver.test_jacobian fixture (#81).
+    # Preserve its full species-block absolute/relative criterion.
+    gas = CreateSolution(joinpath(@__DIR__, "cantera_parity", "fixtures",
+        "cantera-726522be", "h2o2.yaml"); phase="ohmech")
+    mixture = Dict("H2"=>2.4, "O2"=>1.0, "N2"=>3.76)
+    eq = equilibrate(gas; T=500.0, P=20one_atm, X=mixture, mode=:HP)
+    feed = Reservoir(gas; temperature=500.0, pressure=20one_atm, mole_fractions=mixture)
+    sink = Reservoir(gas; temperature=eq.T, pressure=20one_atm, mole_fractions=eq.X)
+    vessel = WellStirredReactor(gas; temperature=eq.T, pressure=20one_atm,
+        mole_fractions=eq.X, volume=1e-3, rate_multipliers=zeros(gas.n_reactions))
+    # Reuse the existing observable callback negative control, with the same physical input.
+    calls = Ref(0)
+    numeric_J, numeric_du = nothing, nothing
+    for mdot in (120.0, (states,t)->(calls[] += 1; 120.0))
+        network = ReactorNetwork((feed=feed, vessel=vessel, sink=sink); flows=(
+            MassFlowController(:feed,:vessel; mdot),
+            MassFlowController(:vessel,:sink; mdot=120.0)))
+        rhs, u = network_rhs(network), network_state(network)
+        J = zeros(length(u), length(u))
+        calls[] = 0
+        network_jacobian!(J, u, rhs)
+        @test calls[] == (mdot isa Real ? 0 : 1 + 2length(u))
+        du = similar(u)
+        rhs(du, u, nothing, 0.0)
+        if mdot isa Real
+            numeric_J, numeric_du = copy(J), copy(du)
+        else
+            @test reinterpret(UInt64, du) == reinterpret(UInt64, numeric_du)
+            @test reinterpret(UInt64, vec(J[end:end,:])) == reinterpret(UInt64, vec(numeric_J[end:end,:]))
+        end
+        ns = gas.n_species
+        mass = sum(@view u[1:ns])
+        for j in 1:ns, i in 1:ns
+            scale = gas.MW[j] / gas.MW[i]
+            actual = J[i,j] * scale
+            expected = 120 / mass * (i == j ? u[i]/mass - 1 : u[i]/mass * scale)
+            @test abs(actual - expected) <= max(1e-12, 5e-4 * abs(expected))
+        end
+    end
+end
