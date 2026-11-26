@@ -52,6 +52,50 @@ include(joinpath(@__DIR__,"..","example","reactors","real_gas_ad_jacobian.jl"))
         @test_throws DimensionMismatch jac(zeros(2,2),u,nothing,0.)
         @test_throws ArgumentError shocktube_ad_jacobian(reactor;chunk=0)
     end
+
+    @testset "Negative trial mass-fraction columns match ReactorRHS" begin
+        for real in (false,true)
+            reactor=real ? RedlichKwongReactor(gas,model;temperature=1400.,pressure=40one_atm,
+                mole_fractions=collect(1.:gas.n_species)) :
+                IdealGasReactor(gas;temperature=1400.,pressure=40one_atm,
+                    mole_fractions=collect(1.:gas.n_species),constraint=:constant_volume)
+            jac=shocktube_ad_jacobian(reactor)
+            J=zeros(gas.n_species+1,gas.n_species+1)
+            h_idx=something(findfirst(==("H"),gas.species_names))
+            o_idx=something(findfirst(==("O"),gas.species_names))
+            for branch in (:one_negative,:two_negative)
+                u=reactor_state(reactor)
+                u[h_idx]=-1e-8
+                branch===:two_negative && (u[o_idx]=-1e-8)
+                u[end-1]+=1-sum(view(u,1:gas.n_species))
+                original=copy(u)
+                jac(J,u,nothing,0.)
+                @test u==original
+                @test all(isfinite,J)
+                if real
+                    # RedlichKwongReactor clips negative trial mass fractions in ReactorRHS.
+                    @test all(iszero,view(J,:,h_idx))
+                    branch===:two_negative && @test all(iszero,view(J,:,o_idx))
+                else
+                    # IdealGasReactor preserves signed trial concentrations in ReactorRHS;
+                    # its default AD Jacobian must retain the exact restoring derivative.
+                    @test norm(view(J,:,h_idx),Inf)>1e3
+                    rhs=reactor_rhs(reactor)
+                    J_fd=zeros(gas.n_species+1,gas.n_species+1)
+                    reactor_jacobian!(J_fd,u,rhs)
+                    col_scale=max(norm(view(J_fd,:,h_idx),Inf),1.0)
+                    tol=2e-3.*abs.(view(J_fd,:,h_idx)).+5e-7*col_scale
+                    @test all(abs.(view(J,:,h_idx).-view(J_fd,:,h_idx)).<=tol)
+                    if branch===:two_negative
+                        col_scale_o=max(norm(view(J_fd,:,o_idx),Inf),1.0)
+                        tol_o=2e-3.*abs.(view(J_fd,:,o_idx)).+5e-7*col_scale_o
+                        @test all(abs.(view(J,:,o_idx).-view(J_fd,:,o_idx)).<=tol_o)
+                    end
+                end
+            end
+        end
+    end
+
     isothermal=IdealGasReactor(gas;temperature=1200.,mole_fractions=Dict("H2"=>1.),
         constraint=:constant_volume,energy=:isothermal)
     @test_throws ArgumentError shocktube_ad_jacobian(isothermal)
