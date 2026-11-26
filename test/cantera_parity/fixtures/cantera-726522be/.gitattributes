@@ -1,0 +1,3 @@
+# Preserve the original GRI30 bytes across Windows checkouts.
+gri30.yaml text eol=lf
+CombustorTest-integrateWithAdvance.csv text eol=lf

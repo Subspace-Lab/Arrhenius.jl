@@ -1,0 +1,22 @@
+# No normalization is needed: all third-body efficiency species are in this
+# 24-species phase (including C2H6). export_wsr_fixture.py checks the empty
+# absent-species set and a strict reload with the skip flag disabled; see
+# equivalence.json: removed_efficiencies=[], strict_probe_passed=true.
+# Both solvers use the untouched raw export; strict reload is validation only.
+cantera_commit = "726522be4e2a13454d8415b7ef799d621f665cf3"
+upstream_test = "test/python/test_reactor.py::TestWellStirredReactorIgnition::test_nonreacting"
+phase = "gas"
+species_names = ["H2", "H", "O", "O2", "OH", "H2O", "HO2", "H2O2", "CH2", "CH2(S)", "CH3", "CH4", "CO", "CO2", "HCO", "CH2O", "CH2OH", "CH3O", "CH3OH", "C2H4", "C2H5", "C2H6", "N2", "AR"]
+species_count = 24
+reaction_count = 129
+duplicate_count = 6
+mechanism_file = "gri30-24.raw.yaml"
+mechanism_sha256_lf = "6295aa137d97648dc7fb5edcb2a6d3dd8d70842813fe652f0e6e3a0500f30bad"
+source_gri30_sha256_lf = "06650b1e0ee0012f6903d5328b1bb218cb6007d07f8ebe375d18f24811039345"
+source_gas_def_sha256_lf = "a07a7bf3b424469e681b2060da41b0bee7802c860680428cd6dc018f754a5a90"
+equivalence_sha256_lf = "d2a3b0bfd368c81d58ee44db5788809c49f31bb1ff31adc49ec9cd1819ad4760"
+integration_rtol = 1e-09
+integration_atol = 1e-15
+temperature_rtol = 1e-05
+assertion_rtol = 1e-06
+assertion_atol = 1e-12
