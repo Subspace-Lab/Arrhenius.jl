@@ -65,7 +65,7 @@ end
         prune=0.0, max_points=1000, max_time_steps=500, loglevel=0,
         initial_time_step=1e-5, domain_check=true, time_step_growth_factor=1.5,
         time_step_growth_strategy=:fixed_growth, time_step_callback=nothing, time_step_regrid=3)
-    premixed_expected(compatible, kind) = (jacobian_mode=compatible ? :auto : :finite_difference,
+    premixed_expected(compatible, kind) = (jacobian_mode=compatible ? :auto : :analytic,
         staged_ladder=compatible, auto=false,
         defaults=merge(premixed_defaults, (domain_check=kind === FreeFlame,)))
     for kind in (FreeFlame, BurnerFlame), compatible in (false, true)
