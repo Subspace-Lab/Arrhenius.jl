@@ -26,8 +26,11 @@ end
     @test (@allocated Arrhenius.flame_residual!(residual,flame,flame.state,workspace)) == 0
     Arrhenius._flame_jacobian(flame,flame.state,workspace,residual;analytic=false)
     @test (@allocated Arrhenius._flame_jacobian(flame,flame.state,workspace,residual;analytic=false)) == 0
-    Arrhenius._flame_jacobian(flame,flame.state,workspace,residual;analytic=true)
-    @test (@allocated Arrhenius._flame_jacobian(flame,flame.state,workspace,residual;analytic=true)) == 0
+    for cantera_omission in (false,true)
+        Arrhenius._flame_jacobian(flame,flame.state,workspace,residual;analytic=true,cantera_omission)
+        @test (@allocated Arrhenius._flame_jacobian(flame,flame.state,workspace,residual;
+            analytic=true,cantera_omission)) == 0
+    end
 end
 
 
