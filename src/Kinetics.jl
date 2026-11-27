@@ -520,7 +520,13 @@ function _rate_factors!(reaction,T,C,S0,h_mole,workspace,reverse_plan=nothing;
     end
 
     if !isempty(reaction.plog.reaction_indices)
-        P = isnothing(pressure) ? sum(C) * R * T : pressure
+        # A PLOG rate is a function of (T, P). The pressure must come from the
+        # thermodynamic state, never from a sum of trial concentrations: an
+        # unnormalised or negative trial vector changes sum(C)*R*T and would
+        # silently move the rate. Cantera refuses to evaluate a PLOG rate
+        # without a pressure for the same reason.
+        P = isnothing(pressure) ? throw(ArgumentError(
+            "pressure is required for PLOG reactions; pass the thermodynamic pressure")) : pressure
         if cached
             # PLOG rates depend only on T and P; reuse them at an unchanged state.
             reuse = !refresh_temperature && temperature_cache.pressure == P
@@ -678,7 +684,15 @@ function _rate_factors!(reaction,T,C,S0,h_mole,workspace,reverse_plan=nothing;
     return nothing
 end
 
-"Compute reaction source terms into preallocated storage."
+"""
+    wdot!(wdot, reaction, T, C, S0, h_mole, workspace; pressure, ...)
+
+Compute reaction source terms into preallocated storage.
+
+`pressure` is the thermodynamic pressure in Pa and is required: PLOG reactions
+depend on it, and it cannot be recovered from the concentration vector, whose
+entries may be unnormalised or negative during a Newton trial.
+"""
 function wdot!(
     wdot,
     reaction,
@@ -687,14 +701,16 @@ function wdot!(
     S0,
     h_mole,
     workspace;
+    pressure,
     get_qdot=false,
     rate_multipliers=nothing,
     log_rate_data=nothing,
     temperature_cache=nothing,
-    pressure=nothing,
     activity_concentrations=nothing,
     get_rate_constants=false,
 )
+    isnothing(pressure) && throw(ArgumentError(
+        "pressure is required; pass the thermodynamic pressure in Pa"))
     _rate_factors!(reaction,T,C,S0,h_mole,workspace;
         rate_multipliers,log_rate_data,temperature_cache,pressure)
     kf,kr=workspace.kf,workspace.kr
@@ -731,20 +747,32 @@ function reaction_rate_constants(gas::Solution;T,P=one_atm,X)
 end
 export reaction_rate_constants
 
-"compute reaction source term `dC/dt`"
+"""
+    wdot_func(reaction, T, C, S0, h_mole; pressure, ...)
+
+Compute the reaction source term `dC/dt`.
+
+`pressure` is the thermodynamic pressure in Pa and is required: PLOG reactions
+depend on it, and it cannot be recovered from the concentration vector, whose
+entries may be unnormalised or negative during a Newton trial. The pressure was
+previously inferred from `sum(C)*R*T`, which silently changed PLOG rates
+whenever the trial composition was not normalised.
+"""
 function wdot_func(
     reaction,
     T,
     C,
     S0,
     h_mole;
+    pressure,
     get_qdot=false,
     rate_multipliers=nothing,
     log_rate_data=nothing,
-    pressure=nothing,
 )
+    isnothing(pressure) && throw(ArgumentError(
+        "pressure is required; pass the thermodynamic pressure in Pa"))
     multiplier_type = isnothing(rate_multipliers) ? Float64 : eltype(rate_multipliers)
-    pressure_type = isnothing(pressure) ? Float64 : typeof(pressure)
+    pressure_type = typeof(pressure)
     workspace_type = promote_type(
         typeof(T),
         eltype(C),

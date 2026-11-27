@@ -222,7 +222,7 @@ end
     end
 end
 
-@testset "PLOG kinetics wrappers honor explicit pressure" begin
+@testset "PLOG kinetics wrappers require the thermodynamic pressure" begin
     gas = CreateSolution(joinpath(@__DIR__, "..", "mechanism", "stagni_2023.yaml"))
     temperature, pressure = 2164.6519745633973, 10one_atm
     X = mole_fractions(gas, Dict("NH3" => 0.7, "H2" => 0.3, "O2" => 0.675,
@@ -238,7 +238,18 @@ end
     entropy = cal_s0_R(gas, temperature, pressure, X) .* R
     explicit = wdot_func(gas.reaction, temperature, C, entropy, h_mole;
         get_qdot=true, pressure)
-    inferred = wdot_func(gas.reaction, temperature, C, entropy, h_mole; get_qdot=true)
-    @test all(isfinite, explicit) && all(isfinite, inferred)
-    @test !isapprox(inferred[143], explicit[143]; rtol=1e-8)
+    @test all(isfinite, explicit)
+    # The pressure is no longer inferred from sum(C)*R*T: the wrapper refuses
+    # to evaluate a PLOG rate without a thermodynamic pressure instead of
+    # silently moving the rate with the perturbed trial composition.
+    @test_throws UndefKeywordError wdot_func(gas.reaction, temperature, C,
+        entropy, h_mole; get_qdot=true)
+    @test_throws ArgumentError wdot_func(gas.reaction, temperature, C,
+        entropy, h_mole; get_qdot=true, pressure=nothing)
+    # With the thermodynamic pressure the PLOG rate constant is the state
+    # value, independent of the perturbed concentration vector.
+    explicit_rates = wdot!(zeros(gas.n_species), gas.reaction, temperature, C,
+        entropy, h_mole, KineticsWorkspace(gas.reaction);
+        get_rate_constants=true, pressure)
+    @test explicit_rates.forward[143] ≈ rates.forward[143] rtol=1e-12
 end

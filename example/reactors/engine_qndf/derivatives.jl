@@ -30,7 +30,8 @@ function engine_ad_jacobian(problem,::Val{N},rate_evaluator,clip_trials) where N
     kinetic=KineticsWorkspace(gas.reaction,D)
     composition_source! = function (out,C)
         rate_evaluator(out,gas.reaction,temperature[],C,floats.entropy,floats.h_mole,kinetic;
-            temperature_cache=cache,rate_multipliers=network.nodes.cylinder.initial.rate_multipliers)
+            temperature_cache=cache,rate_multipliers=network.nodes.cylinder.initial.rate_multipliers,
+            pressure=state.pressure)
         nothing
     end
     concentration_jacobian=zeros(ns,ns)
@@ -51,7 +52,8 @@ function engine_ad_jacobian(problem,::Val{N},rate_evaluator,clip_trials) where N
             concentrations[k]==0 && (concentrations[k]=1e-100)
         end
         rate_evaluator(source,gas.reaction,T,floats.C,floats.entropy,floats.h_mole,floats.kinetics;
-            temperature_cache=cache,rate_multipliers=network.nodes.cylinder.initial.rate_multipliers)
+            temperature_cache=cache,rate_multipliers=network.nodes.cylinder.initial.rate_multipliers,
+            pressure=P)
         ForwardDiff.jacobian!(concentration_jacobian,composition_source!,source,concentrations,configuration)
         Td=engine_temperature_dual(T)
         Arrhenius.cal_cp_R!(td_cp,gas,Td,P,floats.X)
@@ -65,7 +67,7 @@ function engine_ad_jacobian(problem,::Val{N},rate_evaluator,clip_trials) where N
             capacity_temperature+=u[k]*R/gas.MW[k]*ForwardDiff.partials(td_cp[k])[1]
         end
         rate_evaluator(td_source,gas.reaction,Td,floats.C,td_s,td_h,temp_kinetic;
-            rate_multipliers=network.nodes.cylinder.initial.rate_multipliers)
+            rate_multipliers=network.nodes.cylinder.initial.rate_multipliers,pressure=P)
         for k in 1:ns
             for j in 1:ns
                 J[k,j]=(!clip_trials || u[j]>=0) ? gas.MW[k]/gas.MW[j]*concentration_jacobian[k,j] : 0.0
