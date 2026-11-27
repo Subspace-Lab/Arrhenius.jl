@@ -129,9 +129,10 @@ function mixture_transport!(w::TransportWorkspace, gas::Solution, P, T, X; basis
 end
 
 # Unchecked kernel for hot-loop callers that guarantee the public contract.
-function _mixture_transport!(w::TransportWorkspace, gas::Solution, P, T, X, basis::Symbol)
+function _mixture_transport!(w::TransportWorkspace, gas::Solution, P, T, X, basis::Symbol,
+        ::Val{viscosity_needed}=Val(true)) where {viscosity_needed}
     n = gas.n_species
-    if w.molecular_weights != gas.MW
+    if viscosity_needed && w.molecular_weights != gas.MW
         for j in 1:n,k in 1:n
             w.weight_quarter_ratio[j,k] = sqrt(sqrt(gas.MW[j]/gas.MW[k]))
             w.inverse_phi_denominator[j,k] = inv(sqrt(8*(1+gas.MW[k]/gas.MW[j])))
@@ -143,9 +144,12 @@ function _mixture_transport!(w::TransportWorkspace, gas::Solution, P, T, X, basi
     root,inverse_root,mass_fraction_weight,X_floor =
         w.root_viscosity,w.inverse_root_viscosity,w.weighted_mole_fraction,w.floored_mole_fraction
     @inbounds for k in 1:n
-        w.viscosity[k] = sqrtT * _transport_polynomial(gas.trans.species_viscosities_poly, k, logT)^2
+        if viscosity_needed
+            w.viscosity[k] = sqrtT * _transport_polynomial(gas.trans.species_viscosities_poly, k, logT)^2
+            root[k] = sqrt(w.viscosity[k])
+            inverse_root[k] = inv(root[k])
+        end
         w.conductivity[k] = sqrtT * _transport_polynomial(gas.trans.thermal_conductivity_poly, k, logT)
-        root[k] = sqrt(w.viscosity[k]); inverse_root[k] = inv(root[k])
         X_floor[k] = max(X[k], 1.0e-20)
         mass_fraction_weight[k] = X_floor[k]*gas.MW[k]
     end
@@ -154,7 +158,9 @@ function _mixture_transport!(w::TransportWorkspace, gas::Solution, P, T, X, basi
     scale = P/(T*sqrtT)
     @inbounds for j in 1:n, i in 1:j
         value = _transport_polynomial(gas.trans.binary_diff_coeffs_poly, i + (j-1)*n, logT)/scale
-        w.binary[i,j] = value; w.binary[j,i] = value
+        if viscosity_needed || n==1
+            w.binary[i,j] = value; w.binary[j,i] = value
+        end
         inverse = inv(value)
         w.inverse_binary[i,j] = inverse; w.inverse_binary[j,i] = inverse
     end
@@ -167,10 +173,12 @@ function _mixture_transport!(w::TransportWorkspace, gas::Solution, P, T, X, basi
         denominator = 0.0
         invdiff = 0.0
         mass_invdiff = 0.0
-        rk = root[k]
+        rk = viscosity_needed ? root[k] : 0.0
         for j in 1:n
-            phi = muladd(rk*inverse_root[j], w.weight_quarter_ratio[j,k], 1)^2 * w.inverse_phi_denominator[j,k]
-            denominator = muladd(X_floor[j], phi, denominator)
+            if viscosity_needed
+                phi = muladd(rk*inverse_root[j], w.weight_quarter_ratio[j,k], 1)^2 * w.inverse_phi_denominator[j,k]
+                denominator = muladd(X_floor[j], phi, denominator)
+            end
             invdiff = muladd(X_floor[j], w.inverse_binary[j,k], invdiff)
             mass_invdiff = muladd(mass_fraction_weight[j], w.inverse_binary[j,k], mass_invdiff)
         end
@@ -178,7 +186,7 @@ function _mixture_transport!(w::TransportWorkspace, gas::Solution, P, T, X, basi
         invdiff -= X_floor[k]*w.inverse_binary[k,k]
         mass_invdiff -= mass_fraction_weight[k]*w.inverse_binary[k,k]
         othermass = total_mass - mass_fraction_weight[k]
-        viscosity += X_floor[k] * w.viscosity[k] / denominator
+        viscosity_needed && (viscosity += X_floor[k] * w.viscosity[k] / denominator)
         arithmetic += X_floor[k] * w.conductivity[k]
         harmonic += X_floor[k] / w.conductivity[k]
         w.diffusion[k] = if n == 1
