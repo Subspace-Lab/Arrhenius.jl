@@ -924,31 +924,27 @@ function _flame_jacobian(f,u,w,r; previous=nothing,dt=Inf,previous_enthalpy=noth
     if _conservative_flame(f) && previous !== nothing && previous_enthalpy === nothing
         previous_enthalpy = _flame_previous_enthalpy!(w.conservative,f,previous)
     end
-    # Burner inlet/outlet residuals include face-flux terms from the adjacent
-    # interior node. Keep only those endpoint-row finite differences; the
-    # analytic helper fills the interior stencil. FreeFlame follows Cantera
-    # auto mode and omits the corresponding endpoint entries.
+    # Probe adjacent species for the native endpoint equations. Cantera auto
+    # omits these rows on free flames and applies its velocity chain rule.
+    use_hybrid_analytic = analytic && !update_transport &&
+        f isa Union{FreeFlame,BurnerFlame} && !w.clip_species[] &&
+        f.transport_model == :mixture_averaged && !f.soret_enabled &&
+        f.flux_gradient_basis == :mole
+    cantera_temperature = cantera_omission && use_hybrid_analytic &&
+        f isa FreeFlame && f.discretization == :finite_difference
     for k in 1:B, color in 1:3
+        cantera_temperature_fd = cantera_temperature && k == 1
         perturbed_any=false
         node_count=0
         face_count=0
         row_count=0
         for j in color:3:N
-            auto_species_column = analytic && !update_transport && f isa Union{FreeFlame,BurnerFlame} &&
-                f.transport_model == :mixture_averaged && !f.soret_enabled &&
-                f.flux_gradient_basis == :mole && 2 <= k <= B-1 && 2 <= j < N
-            if auto_species_column && !(f isa BurnerFlame && (j == 2 || j == N-1))
+            auto_species_column = use_hybrid_analytic && 2 <= k <= B-1 && 2 <= j < N
+            keep_endpoint_species = (f isa BurnerFlame || !cantera_omission) && (j == 2 || j == N-1)
+            if auto_species_column && !keep_endpoint_species
                 continue
             end
-            cantera_fd = analytic && !update_transport && f isa Union{FreeFlame,BurnerFlame} &&
-                f.transport_model == :mixture_averaged && !f.soret_enabled &&
-                f.flux_gradient_basis == :mole &&
-                2 <= k <= B-1 && (j == 1 || j == N ||
-                    f isa BurnerFlame && (j == 2 || j == N-1))
-            cantera_temperature_fd = analytic && !update_transport && f isa FreeFlame &&
-                f.discretization == :finite_difference &&
-                f.transport_model == :mixture_averaged && !f.soret_enabled &&
-                f.flux_gradient_basis == :mole && k == 1
+            cantera_fd = use_hybrid_analytic && 2 <= k <= B-1 && (j == 1 || j == N || keep_endpoint_species)
             steps[j] = cantera_fd ? _flame_cantera_species_perturbation(u,k,j) :
                 cantera_temperature_fd ? _flame_cantera_temperature_perturbation(u,k,j) :
                 _flame_perturbation(f,u,k,j)
@@ -993,10 +989,9 @@ function _flame_jacobian(f,u,w,r; previous=nothing,dt=Inf,previous_enthalpy=noth
             flame_residual!(rp,f,perturbed,w;previous,dt,previous_enthalpy,update_transport,nodes=color:3:N)
         end
         for j in color:3:N
-            auto_species_column = analytic && !update_transport && f isa Union{FreeFlame,BurnerFlame} &&
-                f.transport_model == :mixture_averaged && !f.soret_enabled &&
-                f.flux_gradient_basis == :mole && 2 <= k <= B-1 && 2 <= j < N
-            if auto_species_column && !(f isa BurnerFlame && (j == 2 || j == N-1))
+            auto_species_column = use_hybrid_analytic && 2 <= k <= B-1 && 2 <= j < N
+            keep_endpoint_species = (f isa BurnerFlame || !cantera_omission) && (j == 2 || j == N-1)
+            if auto_species_column && !keep_endpoint_species
                 continue
             end
             column = (j-1)*B+k
@@ -1013,10 +1008,7 @@ function _flame_jacobian(f,u,w,r; previous=nothing,dt=Inf,previous_enthalpy=noth
                 row = (jj-1)*B+kk
                 band[kl+ku+1+row-column,column] = (rp[kk,jj]-r[kk,jj])/steps[j]
             end
-            k == 1 && analytic && !update_transport && f isa FreeFlame &&
-                f.discretization == :finite_difference &&
-                f.transport_model == :mixture_averaged && !f.soret_enabled &&
-                f.flux_gradient_basis == :mole && (perturbed[B,j] = u[B,j])
+            cantera_temperature_fd && (perturbed[B,j] = u[B,j])
             perturbed[k,j] = u[k,j]
         end
         if local_stencil
@@ -1040,10 +1032,7 @@ function _flame_jacobian(f,u,w,r; previous=nothing,dt=Inf,previous_enthalpy=noth
             copyto!(w.source,w.base_source)
         end
     end
-    if analytic && !update_transport && f isa FreeFlame &&
-            f.discretization == :finite_difference &&
-            f.transport_model == :mixture_averaged && !f.soret_enabled &&
-            f.flux_gradient_basis == :mole
+    if cantera_temperature
         for j in 1:N
             tcol=(j-1)*B+1; mcol=(j-1)*B+B
             slope=-u[B,j]/u[1,j]
@@ -1055,8 +1044,8 @@ function _flame_jacobian(f,u,w,r; previous=nothing,dt=Inf,previous_enthalpy=noth
             end
         end
     end
-    if analytic && !update_transport && f isa Union{FreeFlame,BurnerFlame}
-        _flame_auto_species_jacobian!(band,f,u,w,r;previous,dt) || begin
+    if use_hybrid_analytic
+        _flame_auto_species_jacobian!(band,f,u,w,r;previous,dt,cantera_omission) || begin
             # Unsupported chemistry derivative metadata falls back to full FD.
             fallback=_flame_jacobian(f,u,w,r;previous,dt,previous_enthalpy,
                 analytic=false,update_transport,cantera_omission)

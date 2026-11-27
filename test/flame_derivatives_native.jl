@@ -214,11 +214,12 @@ end
     r=flame_residual!(similar(f.state),f,f.state,w;previous,dt)
     stats=solver_stats(f)
     node_start=stats.property_nodes; residual_start=stats.residual_evals
-    band=copy(Arrhenius._flame_jacobian(f,f.state,w,r;previous,dt,analytic=true))
+    band=copy(Arrhenius._flame_jacobian(f,f.state,w,r;previous,dt,analytic=true,cantera_omission=true))
     optimized_nodes=stats.property_nodes-node_start
     optimized_calls=stats.residual_evals-residual_start
     node_start=stats.property_nodes; residual_start=stats.residual_evals
-    legacy=copy(Arrhenius._flame_jacobian(f,f.state,w,r;previous,dt,analytic=true,local_property_updates=false))
+    legacy=copy(Arrhenius._flame_jacobian(f,f.state,w,r;previous,dt,analytic=true,
+        cantera_omission=true,local_property_updates=false))
     legacy_nodes=stats.property_nodes-node_start
     legacy_calls=stats.residual_evals-residual_start
     @test band==legacy
@@ -258,6 +259,163 @@ end
     @info "analytic Jacobian derivative diagnostic" maxerr worst family
     @test maxerr < 2e-7
 
+end
+
+@testset "clipped premixed analytic Jacobian uses one finite-difference pass" begin
+    mechanism=joinpath(@__DIR__,"..","mechanism","h2o2.yaml")
+    gas=CreateSolution(mechanism)
+    H=findfirst(==("H"),gas.species_names)+1
+    Ar=findfirst(==("AR"),gas.species_names)+1
+    grid=collect(range(0.,.01;length=5))
+    opts=(;X="H2:1.1,O2:1,AR:5",grid,discretization=:finite_difference)
+    for f in (FreeFlame(gas;opts...),BurnerFlame(gas;opts...,mdot=.08))
+        for total in (1.0,1.00003)
+            u=copy(f.state)
+            u[H,3]=-5e-8
+            Y=@view u[2:end-1,3]
+            u[Ar,3]+=total-sum(y->max(y,0.0),Y)
+            @test sum(y->max(y,0.0),Y) ≈ total atol=2eps(total) rtol=0
+            w=Arrhenius.FlameWorkspace(f)
+            w.clip_species[]=true
+            r=flame_residual!(similar(u),f,u,w)
+            stats=solver_stats(f)
+            start=stats.residual_evals
+            fd=copy(Arrhenius._flame_jacobian(f,u,w,r;analytic=false))
+            fd_calls=stats.residual_evals-start
+            start=stats.residual_evals
+            analytic=Arrhenius._flame_jacobian(f,u,w,r;analytic=true,cantera_omission=false)
+            @test analytic==fd
+            @test reinterpret(UInt64,analytic)==reinterpret(UInt64,fd)
+            @test stats.residual_evals-start==fd_calls==3size(u,1)
+        end
+    end
+end
+
+@testset "premixed analytic transport fallback uses the finite-difference solver path" begin
+    mechanism=joinpath(@__DIR__,"..","mechanism","h2o2.yaml")
+    gas=CreateSolution(mechanism)
+    data=MultiTransportData(mechanism*".multicomponent.npz",gas;mechanism)
+    for kind in (:free,:burner), (transport_model,flux_gradient_basis,soret) in (
+            (:mixture_averaged,:mass,false),(:multicomponent,:mole,false),
+            (:mixture_averaged,:mole,true),(:multicomponent,:mole,true))
+        opts=(;X="H2:1.1,O2:1,AR:5",width=.03,discretization=:finite_difference,
+            transport_model,flux_gradient_basis,soret,multicomponent_data=data)
+        makeflame()=kind==:free ? FreeFlame(gas;opts...) : BurnerFlame(gas;opts...,mdot=.3)
+        fd=solve!(makeflame();jacobian_mode=:finite_difference,slope=.10,curve=.20)
+        analytic=solve!(makeflame();jacobian_mode=:analytic,slope=.10,curve=.20)
+        @test fd.converged && analytic.converged
+        @test analytic.grid==fd.grid
+        @test analytic.state==fd.state
+        @test solver_stats(analytic).jacobians==solver_stats(fd).jacobians
+        @test solver_stats(analytic).residual_evals==solver_stats(fd).residual_evals
+    end
+end
+
+@testset "native analytic flame Jacobian differentiates signed reverse mass action" begin
+    mechanism=joinpath(@__DIR__,"..","mechanism","h2o2.yaml")
+    base=CreateSolution(mechanism)
+    H,OH,H2O,Ar=map(name->findfirst(==(name),base.species_names),("H","OH","H2O","AR"))
+    n=base.n_species
+    # H2O + M ⇌ H + OH + M, with Ar as the sole collider.
+    reactant=sparse([H2O],[1],[1.0],n,1)
+    product=sparse([H,OH],[1,1],[1.0,1.0],n,1)
+    collider=sparse([Ar],[1],[1.0],n,1)
+    plog=Arrhenius.PlogData(Int[],[1],Float64[],[1],zeros(0,3))
+    reaction=Arrhenius.Reaction(product,reactant,reactant,[true],[1e-42 0.0 0.0],
+        zeros(0,3),zeros(0,4),[1],Int[],Int[],collider,[[H2O]],[sort([H,OH])],
+        1,product-reactant,[1.0],plog)
+    gas=Arrhenius.Solution(n,1,base.MW,base.species_names,base.elements,base.ele_matrix,
+        base.thermo,base.trans,reaction)
+    grid=collect(range(0.,.01;length=5))
+    f=BurnerFlame(gas;X="H2:1.1,O2:1,AR:5",grid,mdot=.08,discretization=:finite_difference)
+    u=f.state
+    fill!(u,0)
+    u[1,:].=.5
+    u[H+1,:].=-1e-14
+    u[OH+1,:].=1e-8
+    u[Ar+1,:].=1-1e-8+1e-14
+    w=Arrhenius.FlameWorkspace(f)
+    r=flame_residual!(similar(u),f,u,w)
+    fill!(w.diffusion_prefactor,0) # Isolate the chemistry in the frozen residual.
+    flame_residual!(r,f,u,w;update_transport=false)
+    B=size(u,1)
+    j=3
+    col=(j-1)*B+OH+1
+    band_row=4B-1+H2O-OH
+    native=Arrhenius._flame_jacobian(f,u,w,r;analytic=true,cantera_omission=false)[band_row,col]
+    auto=Arrhenius._flame_jacobian(f,u,w,r;analytic=true,cantera_omission=true)[band_row,col]
+    plus,minus=copy(u),copy(u)
+    plus[col]+=1e-10
+    minus[col]-=1e-10
+    rp=flame_residual!(similar(r),f,plus,w;update_transport=false)
+    rm=flame_residual!(similar(r),f,minus,w;update_transport=false)
+    centered=(rp[H2O+1,j]-rm[H2O+1,j])/(plus[col]-minus[col])
+    @test centered<0
+    @test native≈centered rtol=1e-10 atol=0.0
+    # Auto skips ∂(C_H*C_OH)/∂C_OH. The normalization of H and Ar and
+    # the inverse density leave one net inverse-molecular-weight factor.
+    inverse_mw=sum(@view(u[2:B-1,j])./gas.MW)
+    @test auto≈-r[H2O+1,j]/(gas.MW[OH]*inverse_mw) rtol=1e-12 atol=0.0
+end
+
+@testset "native analytic free-flame endpoint Jacobian at fixed mass flux" begin
+    mechanism=joinpath(@__DIR__,"..","mechanism","h2o2.yaml")
+    gas=CreateSolution(mechanism)
+    grid=collect(range(0.,.03;length=7)) # Both endpoints share a color.
+    f=FreeFlame(gas;X="H2:1.1,O2:1,AR:5",grid,discretization=:finite_difference)
+    f.anchor=4
+    u=f.state
+    B,N=size(u)
+    H=findfirst(==("H"),gas.species_names)+1
+    for j in 1:N
+        u[1,j]=.7+.08j
+        u[2:B-1,j].=(1:B-2).+.1j
+        u[2:B-1,j]./=sum(@view(u[2:B-1,j]))
+        u[B,j]=.08+.003j
+    end
+    u[H,N-1:N].=0 # The linear outlet equation then gives exactly -1 in FD.
+    w=Arrhenius.FlameWorkspace(f)
+    r=flame_residual!(similar(u),f,u,w)
+    base_flux=copy(w.flux)
+    fd=copy(Arrhenius._flame_jacobian(f,u,w,r;analytic=false))
+    stats=solver_stats(f)
+    start=stats.property_nodes
+    band=copy(Arrhenius._flame_jacobian(f,u,w,r;analytic=true,cantera_omission=false))
+    @test stats.property_nodes-start==N+4(B-2)
+    legacy=copy(Arrhenius._flame_jacobian(f,u,w,r;analytic=true,cantera_omission=false,
+        local_property_updates=false))
+    flame_residual!(r,f,u,w;update_transport=false)
+    fill!(@view(w.band[1:2B-1,:]),NaN)
+    actual=Arrhenius._flame_jacobian(f,u,w,r;analytic=true,cantera_omission=false)
+    @test actual[2B:end,:]==band[2B:end,:]==legacy[2B:end,:]
+    @test w.flux==base_flux
+    outlet_species_col=(N-2)*B+H
+    @test band[5B-1,outlet_species_col]==-1.0
+    for (boundary,adjacent) in ((1,2),(N,N-1)), k in 1:B
+        col=(adjacent-1)*B+k
+        row=(boundary-1)*B+B
+        if k<B
+            @test band[4B-1+row-col,col]==0.0 # The continuity row depends only on mass flux.
+        end
+    end
+    plus,minus=copy(u),copy(u)
+    rp,rm=similar(r),similar(r)
+    for (boundary,adjacent) in ((1,2),(N,N-1)), j in (boundary,adjacent), k in 1:B
+        col=(j-1)*B+k
+        step=1e-6
+        plus[col]=u[col]+step
+        minus[col]=u[col]-step
+        flame_residual!(rp,f,plus,w;update_transport=false)
+        flame_residual!(rm,f,minus,w;update_transport=false)
+        for l in 1:B
+            row=(boundary-1)*B+l
+            band_row=4B-1+row-col
+            centered=(rp[l,boundary]-rm[l,boundary])/(plus[col]-minus[col])
+            @test band[band_row,col]≈centered rtol=1e-4 atol=1e-7
+            @test fd[band_row,col]≈centered rtol=1e-4 atol=1e-7
+        end
+        plus[col]=minus[col]=u[col]
+    end
 end
 
 @testset "colored stencil preserves the base state between probes" begin
@@ -389,7 +547,7 @@ end
     end
     w=Arrhenius.FlameWorkspace(f)
     r=similar(f.state); flame_residual!(r,f,f.state,w)
-    boundary_jac=Arrhenius._flame_jacobian(f,f.state,w,r;analytic=true)
+    boundary_jac=Arrhenius._flame_jacobian(f,f.state,w,r;analytic=true,cantera_omission=true)
     @test Arrhenius._flame_cantera_species_perturbation(f.state,2,1) ==
         1e-5*abs(f.state[2,1])+1e-10
     @test Arrhenius._flame_cantera_temperature_perturbation(f.state,1,1) ≈
@@ -439,7 +597,8 @@ end
     maxrel=0.0
     for j in 2:N-1
         ok=Arrhenius._flame_source_jacobian!(G,d,gas,f.pressure,1000f.state[1,j],
-            @view(f.state[2:n+1,j]),@view(w.X[:,j]),@view(w.h[:,j]),w.rate_caches[j])
+            @view(f.state[2:n+1,j]),@view(w.X[:,j]),@view(w.h[:,j]),w.rate_caches[j];
+            cantera_compatible=true)
         @test ok
         diff=G[:,2:end]-expected[:,:,j]
         maxrel=max(maxrel,norm(diff)/max(norm(expected[:,:,j]),1e-300))

@@ -234,13 +234,13 @@ end
 _AutoSpeciesWorkspace(gas,N) = _AutoSpeciesWorkspace(_ConservativeFlameDerivatives(gas,0),
     zeros(gas.n_species,gas.n_species+1),zeros(N))
 
-"""Fill Cantera-auto interior species columns for the native finite-difference residual.
+"""Fill interior species columns for the native finite-difference residual.
 
 The mixture-averaged transport coefficients are frozen. This helper fills only
 interior residual rows; the caller applies kind-specific endpoint handling. Unsupported
 transport configurations return false for full finite differences.
 """
-function _flame_auto_species_jacobian!(band,f,u,w,r;previous=nothing,dt=Inf)
+function _flame_auto_species_jacobian!(band,f,u,w,r;previous=nothing,dt=Inf,cantera_omission::Bool=false)
     f isa Union{FreeFlame,BurnerFlame} || return false
     (f.transport_model == :mixture_averaged && !f.soret_enabled &&
         f.flux_gradient_basis == :mole) || return false
@@ -263,7 +263,7 @@ function _flame_auto_species_jacobian!(band,f,u,w,r;previous=nothing,dt=Inf)
         invmw=sum(ratios)
         _flame_source_jacobian!(G,d,f.gas,f.pressure,1000u[1,j],
             @view(u[2:n+1,j]),@view(w.X[:,j]),@view(w.h[:,j]),w.rate_caches[j];
-            cantera_compatible=(f.discretization==:finite_difference)) || return false
+            cantera_compatible=(cantera_omission && f.discretization==:finite_difference)) || return false
         for face in (j-1,j)
             dz=f.grid[face+1]-f.grid[face]
             raw_sum=0.0
@@ -343,7 +343,7 @@ function _flame_auto_species_jacobian!(band,f,u,w,r;previous=nothing,dt=Inf)
             end
         end
     end
-    if f isa FreeFlame
+    if cantera_omission && f isa FreeFlame
         # Cantera's analytic species columns omit boundary residual rows in
         # (Y,u) coordinates. In native (Y,m) coordinates those rows retain
         # the velocity-column chain-rule term du/dY at fixed mass flux.
