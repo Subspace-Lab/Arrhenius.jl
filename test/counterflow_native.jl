@@ -2,6 +2,77 @@ using Test, Arrhenius, LinearAlgebra, NPZ
 if !isdefined(Arrhenius,:CounterflowDiffusionFlame)
     Base.include(Arrhenius,joinpath(@__DIR__,"..","src","CounterflowFlames.jl"))
 end
+
+@testset "counterflow band correction with a matrix residual" begin
+    B=13  # h2o2 diffusion flame: T, nine species, V, Lambda, mass flux
+    r=reshape(Float64.(1:B*6),B,6)
+    residual=vec(r)
+    correction=similar(residual)
+    bw=2B-1
+    band=zeros(3bw+1,length(r))
+    band[2bw+1,:].=1
+    _,pivots=LinearAlgebra.LAPACK.gbtrf!(bw,bw,length(r),band)
+    Arrhenius._flame_solve_correction!(correction,band,pivots,residual,bw)
+    @test reshape(correction,size(r)) == -r
+    @test (@allocated Arrhenius._flame_solve_correction!(correction,band,pivots,residual,bw)) == 0
+end
+
+function _counterflow_cached_step_bytes(f,w,start,policy,tol)
+    copyto!(f.state,start)
+    w.jac_age=0
+    return @allocated Arrhenius._counterflow_newton!(f,w;previous=start,maxiters=1,
+        newton_options=policy,tolerance=tol)
+end
+
+@testset "counterflow Newton step matches the allocating band solve" begin
+    gas=CreateSolution(joinpath(@__DIR__,"..","mechanism","h2o2.yaml"))
+    seed=CounterflowDiffusionFlame(gas;fuel="H2:1,AR:1",oxidizer="O2:.2,AR:.8",
+        mdot_fuel=.24,mdot_oxidizer=.72,P=one_atm,width=.02)
+    solve!(seed;ratio=8.,slope=.3,curve=.5)
+    for control in (false,true), compatible in (false,true)
+        f=deepcopy(seed)
+        control && set_two_point_control!(f;temperature=1200.,decrement=.001)
+        f.state[1,3]+=1e-6  # Both policies accept the undamped step near this solution.
+        u=f.state; start=copy(u); B=size(u,1); bw=2B-1
+        w=CounterflowWorkspace(f); r=similar(u)
+        counterflow_residual!(r,f,u,w)
+        band=Arrhenius._counterflow_jacobian!(f,u,w,r)
+        _,pivots=LinearAlgebra.LAPACK.gbtrf!(bw,bw,length(u),band)
+        correction=-vec(copy(r))
+        LinearAlgebra.LAPACK.gbtrs!('N',bw,bw,length(u),band,pivots,correction)
+        expected=u.+reshape(correction,size(u))
+
+        actual=solver_stats(f)
+        Arrhenius.reset!(actual)
+        iterations=Ref(0)
+        ok=Arrhenius._counterflow_newton!(f,CounterflowWorkspace(f);iterations,
+            maxiters=1,tolerance=0.,newton_options=NewtonPolicyOptions(cantera_compatible=compatible))
+        @test ok==compatible
+        @test f.state==expected
+        @test reinterpret(UInt64,vec(f.state))==reinterpret(UInt64,vec(expected))
+        @test iterations[]==1
+        counters=CounterflowStats()
+        counters.newton_calls=counters.newton_iterations=counters.jacobians=1
+        # Initial residual, three colors per component, trial, and the iteration-cap check.
+        counters.residual_evals=1+3B+1+!compatible
+        @test all(k->getfield(actual,k)==getfield(counters,k),fieldnames(CounterflowStats))
+
+        if !control && !compatible
+            # A small transient correction returns immediately after the bounds
+            # check. Compare it to the same call returning at the residual check
+            # to cancel setup and residual allocations on this Julia version.
+            w.pivots=pivots; w.jac_valid=true; w.jac_dt=Inf
+            policy=NewtonPolicyOptions(step_bounds=:cantera)
+            _counterflow_cached_step_bytes(f,w,start,policy,0.)
+            setup_bytes=_counterflow_cached_step_bytes(f,w,start,policy,Inf)
+            @test f.state==start
+            step_bytes=_counterflow_cached_step_bytes(f,w,start,policy,0.)
+            @test f.state==expected
+            @test step_bytes-setup_bytes < sizeof(start)
+        end
+    end
+end
+
 @testset "native axisymmetric counterflow" begin
     mechanism=joinpath(dirname(pathof(Arrhenius)),"..","mechanism","h2o2.yaml")
     if isfile(mechanism*".npz")
