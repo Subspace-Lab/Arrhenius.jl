@@ -60,7 +60,17 @@ function audit_mechanism(path; phase=nothing, data_paths=String[], validate=fals
         length(ids)<2 && continue
         flagged=[i for i in ids if get(reactions[i],"duplicate",false)===true]
         if isempty(flagged)
-            push!(issues,(level=:warning,check=:duplicate_unflagged_candidates,reactions=ids,detail="same stoichiometry candidates lack duplicate: true; Cantera type/third-body checks are not fully reproduced"))
+            exact_pair = any(ids[a] < ids[b] && begin
+                left = copy(reactions[ids[a]])
+                right = copy(reactions[ids[b]])
+                pop!(left, "id", nothing); pop!(right, "id", nothing)
+                left == right
+            end for a in eachindex(ids), b in eachindex(ids))
+            level = exact_pair ? :error : :warning
+            detail = exact_pair ?
+                "identical unflagged reaction definitions; Cantera rejects undeclared duplicates" :
+                "same stoichiometry candidates lack duplicate: true; Cantera type/third-body checks are not fully reproduced"
+            push!(issues,(level=level,check=:duplicate_unflagged_candidates,reactions=ids,detail=detail))
         elseif length(flagged)<2
             push!(issues,(level=:warning,check=:duplicate_orphan_flag_candidates,reactions=ids,detail="duplicate flag has no same-stoichiometry flagged partner in this screen"))
         end
@@ -105,7 +115,9 @@ function audit_mechanism(path; phase=nothing, data_paths=String[], validate=fals
             end
         end
         tlo,thi=trange isa AbstractVector && length(trange)==2 ? (Float64(trange[1]),Float64(trange[2])) : (nothing,nothing)
+        cantera_validation_temperatures=Float64[300,500,1000,2000,5000,10000]
         temperatures=Float64[200,300,500,1000,2000,3000]
+        append!(temperatures,cantera_validation_temperatures)
         tlo!==nothing && append!(temperatures,(tlo,thi))
         for T in unique(temperatures)
             T>0 || continue
@@ -124,6 +136,16 @@ function audit_mechanism(path; phase=nothing, data_paths=String[], validate=fals
                     push!(issues,(level=:error,check=:plog_nonpositive_rate,
                         reaction=j,temperature=T,pressure=p,log_abs_rate=logk,
                         detail="summed PLOG rate at this tabulated pressure is nonpositive"))
+                elseif logk < log(nextfloat(0.0))
+                    # Cantera checks the pressure knots after the first (lowest) knot.
+                    cantera_checks_rate = T in cantera_validation_temperatures && p != first(pressures)
+                    level = cantera_checks_rate ? :error : :warning
+                    check = level == :error ? :plog_zero_rate : :plog_underflow_risk
+                    push!(issues,(level=level,check=check,reaction=j,
+                        temperature=T,pressure=p,log_rate=logk,
+                        detail=level == :error ?
+                            "PLOG rate underflows to zero at a Cantera validation temperature" :
+                            "PLOG group underflows to zero; diagnostic computed in log space"))
                 elseif logk < log(floatmin(Float64))
                     push!(issues,(level=:warning,check=:plog_underflow_risk,reaction=j,
                         temperature=T,pressure=p,log_rate=logk,
@@ -201,7 +223,16 @@ function _audit_nasa_continuity(root,ph,names,defs)
         valslope=dcp(lo,mid)-dcp(hi,mid)
         scale=(max(abs(cp(lo,mid)),abs(cp(hi,mid)),1.0),max(abs(h(lo,mid)),abs(h(hi,mid)),1.0),max(abs(s(lo,mid)),abs(s(hi,mid)),1.0))
         maxrel=maximum(abs(vals[i])/scale[i] for i in 1:3)
-        (maxrel>1e-6 || abs(valslope)*mid/max(scale[1],1.0)>1e-6) && push!(issues,(level=:warning,check=:nasa_continuity,species=name,Tmid=mid,delta_cp_R=vals[1],delta_dcp_R_dT=valslope,delta_h_RT=vals[2],delta_s_R=vals[3],max_relative=maxrel))
+        if model == "nasa7"
+            cp_low=cp(lo,mid); s_low=s(lo,mid)
+            report_warning = abs(vals[1]/(abs(cp_low)+1e-4)) > 0.01 ||
+                abs(vals[2]/cp_low) > 0.001 ||
+                abs(vals[3]/(abs(s_low)+cp_low)) > 0.001 ||
+                abs(valslope)*mid/max(scale[1],1.0) > 1e-6
+        else
+            report_warning = maxrel > 1e-6 || abs(valslope)*mid/max(scale[1],1.0) > 1e-6
+        end
+        report_warning && push!(issues,(level=:warning,check=:nasa_continuity,species=name,Tmid=mid,delta_cp_R=vals[1],delta_dcp_R_dT=valslope,delta_h_RT=vals[2],delta_s_R=vals[3],max_relative=maxrel))
     end
     issues
 end
